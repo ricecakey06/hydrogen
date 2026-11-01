@@ -133,10 +133,6 @@ jobs:
           version: ${{ steps.version.outputs.version }}
           commitish: ${{ github.sha }}
           publish: false
-          footer: |
-            ## Build / 构建来源
-            [GitHub Actions #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            Commit: `${{ github.sha }}`
       - name: Attach assets and publish
         env:
           RELEASE_TAG: ${{ steps.draft.outputs.tag_name }}
