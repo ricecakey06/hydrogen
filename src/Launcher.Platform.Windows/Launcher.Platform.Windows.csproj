@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Platform-neutral target framework on purpose: the release composition selects these adapters at run time. -->
+  <ItemGroup>
+    <ProjectReference Include="../Launcher.Contracts/Launcher.Contracts.csproj" />
+    <ProjectReference Include="../Launcher.Runtime/Launcher.Runtime.csproj" />
+    <ProjectReference Include="../Launcher.Features/Launcher.Features.csproj" />
+  </ItemGroup>
+</Project>

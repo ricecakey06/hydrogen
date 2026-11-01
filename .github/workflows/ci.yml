@@ -1,0 +1,99 @@
+name: Build and test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AVALONIA_TELEMETRY_OPTOUT: '1'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+
+jobs:
+  test:
+    name: Build and test (${{ matrix.os }})
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages*.lock.json'
+      - name: Restore dependencies
+        run: dotnet restore Launcher.slnx --locked-mode
+      - name: Build Release
+        run: dotnet build Launcher.slnx --configuration Release --no-restore
+      - name: Run tests
+        run: dotnet test Launcher.slnx --configuration Release --no-build --no-restore
+      # --check activates the UI plugins, which open the main window, so Linux needs a virtual display.
+      - name: Check startup
+        if: runner.os != 'Linux'
+        run: dotnet run --project src/Launcher.Bootstrap --configuration Release --no-build --no-restore -- --check
+      - name: Check startup with virtual display
+        if: runner.os == 'Linux'
+        run: xvfb-run -a dotnet run --project src/Launcher.Bootstrap --configuration Release --no-build --no-restore -- --check
+
+  windows-package:
+    name: Package Windows x64
+    needs: test
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages*.lock.json'
+      - name: Publish standalone executable
+        run: dotnet publish src/Launcher.Bootstrap --configuration Release -p:PublishProfile=win-x64 -p:RestoreLockedMode=true
+      - name: Check packaged startup and plugin repair
+        shell: pwsh
+        run: |
+          $files = @(Get-ChildItem -LiteralPath artifacts/publish/win-x64 -File)
+          if ($files.Count -ne 1 -or $files[0].Name -ne 'Launcher.exe') {
+            throw 'The host distribution must contain only Launcher.exe.'
+          }
+          # Launcher.exe is a GUI-subsystem executable, so wait for it explicitly to get its exit code.
+          $check = Start-Process -FilePath $files[0].FullName -ArgumentList '--check' -WindowStyle Hidden -Wait -PassThru
+          if ($check.ExitCode -ne 0) { throw 'Packaged host check failed.' }
+          $pluginRoot = Join-Path $files[0].DirectoryName 'LauncherData/Plugins'
+          foreach ($id in @('ui.shell', 'ui.launcher', 'storage', 'account.offline', 'minecraft.download')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $pluginRoot "$id/plugin.json"))) {
+              throw "Official plugin was not released: $id"
+            }
+          }
+          # Replacing official files must not reset saved user preferences.
+          $statePath = Join-Path $pluginRoot 'plugins.json'
+          $state = '{"schemaVersion":1,"plugins":{"account.offline":{"enabled":true,"pendingRemoval":false}}}'
+          [IO.File]::WriteAllText($statePath, $state)
+          $assemblyPath = Join-Path $pluginRoot 'account.offline/Launcher.Features.dll'
+          $assemblyHash = (Get-FileHash -LiteralPath $assemblyPath -Algorithm SHA256).Hash
+          [IO.File]::WriteAllBytes($assemblyPath, [byte[]]@(1, 2, 3))
+          $check = Start-Process -FilePath $files[0].FullName -ArgumentList '--check' -WindowStyle Hidden -Wait -PassThru
+          if ($check.ExitCode -ne 0) { throw 'Packaged restart check failed.' }
+          if ([IO.File]::ReadAllText($statePath) -cne $state) { throw 'Plugin preferences were overwritten.' }
+          if ((Get-FileHash -LiteralPath $assemblyPath -Algorithm SHA256).Hash -ne $assemblyHash) {
+            throw 'Official plugin was not repaired.'
+          }
+      - name: Upload Windows executable
+        uses: actions/upload-artifact@v7
+        with:
+          name: Hydrogen-win-x64
+          path: artifacts/publish/win-x64/Launcher.exe
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,28 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Launcher.UI.ViewModels"
+             xmlns:motion="using:Launcher.UI.Motion"
+             x:Class="Launcher.UI.Views.PluginInstallView" x:ClassModifier="internal"
+             x:DataType="vm:PluginManagerViewModel" FontWeight="330"
+             KeyboardNavigation.TabNavigation="Cycle" AutomationProperties.Name="安装本地插件">
+  <Border Background="#FAFBFC" CornerRadius="16" Padding="26" Margin="32" MaxWidth="536"
+          VerticalAlignment="Center" motion:Motion.EntranceDelay="0">
+    <StackPanel Spacing="18">
+      <TextBlock Text="安装本地插件" FontSize="22" FontWeight="330" />
+      <TextBlock Text="选择 .hplugin 或 .zip 插件包。插件将在重启后运行，请仅安装你信任的插件。" FontSize="14"
+                 Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" LineHeight="23" />
+      <Button Theme="{StaticResource FlatButton}" Command="{Binding BrowsePackage}" IsEnabled="{Binding !IsBusy}"
+              HorizontalAlignment="Stretch" Height="46" HorizontalContentAlignment="Left">
+        <TextBlock Text="{Binding PackageLabel}" TextTrimming="CharacterEllipsis" FontSize="15" />
+      </Button>
+      <TextBlock Text="插件包根目录需包含 plugin.json 与入口 DLL。" Classes="plugin-label" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding ActionMessage}" Classes="issue" FontSize="14" TextWrapping="Wrap" IsVisible="{Binding IsError}" />
+      <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" Height="3" />
+      <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+        <Button Theme="{StaticResource FlatButton}" Content="取消" Command="{Binding CloseInstall}" FontSize="15" />
+        <Button Theme="{StaticResource PluginPrimaryButton}" Content="{Binding InstallActionLabel}"
+                Command="{Binding Install}" IsEnabled="{Binding CanInteract}" />
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</UserControl>

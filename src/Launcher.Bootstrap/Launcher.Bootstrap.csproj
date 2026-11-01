@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- A GUI subsystem executable on Windows: no console window. Elsewhere this is the same as Exe. -->
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>Launcher</AssemblyName>
+    <ApplicationIcon>../Launcher.UI/Assets/hydrogen-icon.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Avalonia.Desktop is the release composition's choice of platform backends (Win32, X11, macOS). -->
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+    <ProjectReference Include="../Launcher.Runtime/Launcher.Runtime.csproj" />
+    <ProjectReference Include="../Launcher.UI/Launcher.UI.csproj" />
+    <ProjectReference Include="../Launcher.Platform.Windows/Launcher.Platform.Windows.csproj" />
+    <ProjectReference Include="../Launcher.Plugins/Launcher.Plugins.csproj" />
+    <ProjectReference Include="../Launcher.Features/Launcher.Features.csproj" />
+    <ProjectReference Include="../Launcher.Downloads/Launcher.Downloads.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyMetadata Include="MicrosoftClientId" Value="$(MicrosoftClientId)" />
+  </ItemGroup>
+  <!-- Compile against the product modules, but distribute their bytes only as resources.
+       The host loads the released copies from LauncherData/Plugins at startup. -->
+  <Target Name="EmbedOfficialPlugins" BeforeTargets="AssignTargetPaths" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <OfficialPluginAssembly Include="@(ReferenceCopyLocalPaths)"
+        Condition="'%(Filename)' == 'Launcher.UI' or '%(Filename)' == 'Launcher.Features' or '%(Filename)' == 'Launcher.Platform.Windows' or '%(Filename)' == 'Launcher.Downloads'" />
+      <EmbeddedResource Include="@(OfficialPluginAssembly)" LogicalName="OfficialPlugins.%(Filename)%(Extension)" />
+      <ReferenceCopyLocalPaths Remove="@(OfficialPluginAssembly)" />
+    </ItemGroup>
+  </Target>
+  <Target Name="ExcludeOfficialPluginAssemblies" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+        Condition="'%(Filename)' == 'Launcher.UI' or '%(Filename)' == 'Launcher.Features' or '%(Filename)' == 'Launcher.Platform.Windows' or '%(Filename)' == 'Launcher.Downloads'" />
+    </ItemGroup>
+  </Target>
+</Project>

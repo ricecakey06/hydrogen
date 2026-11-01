@@ -1,0 +1,161 @@
+<!-- The home page (design/hydrogen-home.svg). Vertical positions are measured from the top of the window body,
+     which is y = 213 on the 1920 × 1080 artboard. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Launcher.UI.ViewModels"
+             xmlns:motion="using:Launcher.UI.Motion"
+             x:Class="Launcher.UI.Views.HomeView"
+             x:ClassModifier="internal"
+             x:DataType="vm:HomeViewModel">
+  <UserControl.Styles>
+    <Style Selector="Button.account-mode">
+      <Setter Property="Width" Value="96" />
+      <Setter Property="Height" Value="34" />
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="CornerRadius" Value="17" />
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="Button.account-mode.selected">
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="Button.account-mode.selected /template/ Border#PART_Body">
+      <Setter Property="Background" Value="#E7EBEF" />
+      <Setter Property="BorderBrush" Value="#939DA8" />
+    </Style>
+    <Style Selector="Button.account-mode /template/ Border#PART_Focus">
+      <Setter Property="CornerRadius" Value="20" />
+    </Style>
+    <Style Selector="Button.large">
+      <Setter Property="FontSize" Value="24" />
+      <Setter Property="Height" Value="48" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="TextBlock#Status">
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock#Status.failed">
+      <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}" />
+    </Style>
+    <Style Selector="Arc.spinner">
+      <Style.Animations>
+        <Animation Duration="0:0:1.2" IterationCount="Infinite" Easing="LinearEasing">
+          <KeyFrame Cue="0%"><Setter Property="RotateTransform.Angle" Value="0" /></KeyFrame>
+          <KeyFrame Cue="100%"><Setter Property="RotateTransform.Angle" Value="360" /></KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+  </UserControl.Styles>
+
+  <Grid Width="558" HorizontalAlignment="Center" RowDefinitions="362.6,100.8,40.1,48,20,48,*">
+    <StackPanel Name="AccountModeButtons" Orientation="Horizontal" Spacing="12" Margin="0,60,0,0"
+                HorizontalAlignment="Center" VerticalAlignment="Top" IsVisible="{Binding HasAccountModes}"
+                motion:Motion.EntranceDelay="0">
+      <Button Theme="{StaticResource FlatButton}" Classes="account-mode" Classes.selected="{Binding IsMicrosoftMode}"
+              Content="正版" Command="{Binding SelectMicrosoft}" IsEnabled="{Binding CanSwitchAccountMode}"
+              AutomationProperties.Name="正版登录" />
+      <Button Theme="{StaticResource FlatButton}" Classes="account-mode" Classes.selected="{Binding IsOfflineMode}"
+              Content="离线" Command="{Binding SelectOffline}" IsEnabled="{Binding CanSwitchAccountMode}"
+              AutomationProperties.Name="离线登录" />
+    </StackPanel>
+    <!-- Signed-out and offline accounts use the bundled user icon. Microsoft skin layers keep pixel-perfect scaling. -->
+    <Panel Width="128" Height="128" Margin="0,118,0,0" HorizontalAlignment="Center" VerticalAlignment="Top"
+           motion:Motion.EntranceDelay="0">
+      <Image Name="DefaultAvatar" Source="avares://Launcher.UI/Assets/default-avatar.png" IsVisible="{Binding !HasFace}"
+             Stretch="Uniform" RenderOptions.BitmapInterpolationMode="HighQuality" AutomationProperties.Name="默认用户头像" />
+      <Image Source="{Binding Face}" RenderOptions.BitmapInterpolationMode="None" />
+      <Image Source="{Binding FaceHat}" RenderOptions.BitmapInterpolationMode="None" />
+    </Panel>
+    <Grid ColumnDefinitions="*,Auto,*" IsVisible="{Binding IsSignedIn}"
+          Margin="0,265,0,0" VerticalAlignment="Top" motion:Motion.EntranceDelay="30">
+      <TextBlock Grid.Column="1" Text="{Binding PlayerName}" MaxWidth="400" TextTrimming="CharacterEllipsis"
+                 FontSize="38" FontWeight="450" Foreground="{DynamicResource TextPrimaryBrush}"
+                 VerticalAlignment="Center" ToolTip.Tip="{Binding PlayerName}" motion:Motion.AnimateText="True" />
+      <Button Grid.Column="2" Name="EditOfflineNameButton" Theme="{StaticResource IconButton}"
+              Command="{Binding ShowLauncherSettings}" Width="44" Height="44" Margin="8,0,0,0"
+              HorizontalAlignment="Left" VerticalAlignment="Center" IsVisible="{Binding IsOfflineMode}"
+              IsEnabled="{Binding CanSwitchAccountMode}" AutomationProperties.Name="修改离线名称"
+              ToolTip.Tip="修改离线名称">
+        <Path Width="22" Height="22" Stretch="Uniform" Data="M2,15 L1,21 L7,20 L21,6 L16,1 Z M13,4 L18,9 M2,15 L7,20"
+              Stroke="{DynamicResource IconBrush}" StrokeThickness="1.8" StrokeLineCap="Round" StrokeJoin="Round" />
+      </Button>
+    </Grid>
+    <Button Theme="{StaticResource FlatButton}" Content="{Binding SignInLabel}" Command="{Binding SignIn}"
+            IsVisible="{Binding CanSignIn}" FontSize="18" Height="44" MinWidth="200"
+            Margin="0,266,0,0" HorizontalAlignment="Center" VerticalAlignment="Top" motion:Motion.EntranceDelay="30" />
+    <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsSigningIn}"
+                Margin="0,276,0,0" HorizontalAlignment="Center" VerticalAlignment="Top" motion:Motion.EntranceDelay="0">
+      <TextBlock Text="正在浏览器中登录" FontSize="18" Foreground="{DynamicResource TextSecondaryBrush}"
+                 VerticalAlignment="Center" />
+      <Button Theme="{StaticResource LinkButton}" Content="取消" FontSize="16" Command="{Binding CancelSignIn}"
+              VerticalAlignment="Center" />
+    </StackPanel>
+    <TextBlock Text="{Binding VersionText}" FontSize="20" Foreground="{DynamicResource TextSecondaryBrush}"
+               MaxWidth="520" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding VersionText}"
+               Margin="0,323,0,0" HorizontalAlignment="Center" VerticalAlignment="Top"
+               motion:Motion.EntranceDelay="50" motion:Motion.AnimateText="True" />
+
+    <Panel Name="DownloadProgressEntry" Width="52" Height="52" HorizontalAlignment="Right" VerticalAlignment="Top"
+           Margin="0,16,4,0" IsVisible="{Binding HasDownloads}">
+      <Arc Width="50" Height="50" StartAngle="-90" SweepAngle="{Binding DownloadSweep}"
+           Stroke="{DynamicResource LaunchIconBrush}" StrokeThickness="2.5" StrokeLineCap="Round"
+           IsVisible="{Binding IsDownloadDeterminate}">
+        <Arc.Transitions>
+          <Transitions><DoubleTransition Property="SweepAngle" Duration="0:0:0.18" Easing="CubicEaseOut" /></Transitions>
+        </Arc.Transitions>
+      </Arc>
+      <Arc Width="50" Height="50" StartAngle="-90" SweepAngle="90" RenderTransformOrigin="50%,50%"
+           Stroke="{DynamicResource LaunchIconBrush}" StrokeThickness="2.5" StrokeLineCap="Round"
+           Classes.spinner="{Binding IsDownloadIndeterminate}" IsVisible="{Binding IsDownloadIndeterminate}" />
+      <Button Name="DownloadProgressButton" Theme="{StaticResource IconButton}" Command="{Binding ShowDownloads}"
+              HorizontalAlignment="Center" VerticalAlignment="Center" AutomationProperties.Name="{Binding DownloadActionName}"
+              ToolTip.Tip="{Binding DownloadActionName}">
+        <Path Data="M10,0 V17 M3,10 L10,17 L17,10 M0,20 V24 H20 V20"
+              Stroke="{DynamicResource IconBrush}" StrokeThickness="2" StrokeLineCap="Round" StrokeJoin="Round" />
+      </Button>
+    </Panel>
+
+    <!-- Launch: play, or stop while preparing. The ring appears only while a launch is in progress. -->
+    <Panel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" motion:Motion.EntranceDelay="80">
+      <Arc Width="114" Height="114" StartAngle="-90" SweepAngle="{Binding ProgressSweep}"
+           Stroke="{DynamicResource LaunchIconBrush}" StrokeThickness="3" StrokeLineCap="Round"
+           IsVisible="{Binding IsProgressDeterminate}">
+        <Arc.Transitions>
+          <Transitions><DoubleTransition Property="SweepAngle" Duration="0:0:0.18" Easing="CubicEaseOut" /></Transitions>
+        </Arc.Transitions>
+      </Arc>
+      <Arc Width="114" Height="114" StartAngle="-90" SweepAngle="90"
+           RenderTransformOrigin="50%,50%"
+           Stroke="{DynamicResource LaunchIconBrush}" StrokeThickness="3" StrokeLineCap="Round"
+           Classes.spinner="{Binding IsProgressIndeterminate}" IsVisible="{Binding IsProgressIndeterminate}" />
+      <Button Theme="{StaticResource LaunchButton}" Classes="launch" HorizontalAlignment="Center" VerticalAlignment="Center"
+              Command="{Binding LaunchOrCancel}" IsEnabled="{Binding IsLaunchEnabled}"
+              AutomationProperties.Name="{Binding LaunchActionName}" ToolTip.Tip="{Binding LaunchActionName}">
+        <Panel>
+          <Path Data="M0,0 L25.5,15 L0,30 Z" Stroke="{DynamicResource LaunchIconBrush}" StrokeThickness="7"
+                StrokeJoin="Round" Margin="7.5,0,0,0" IsVisible="{Binding !IsLaunchBusy}" motion:Motion.EntranceDelay="0" />
+          <Path Data="M0,0 H20 V20 H0 Z" Stroke="{DynamicResource LaunchIconBrush}" StrokeThickness="6"
+                StrokeJoin="Round" IsVisible="{Binding IsLaunchBusy}" motion:Motion.EntranceDelay="0" />
+        </Panel>
+      </Button>
+    </Panel>
+
+    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasStatus}"
+                HorizontalAlignment="Center" VerticalAlignment="Center" motion:Motion.EntranceDelay="0">
+      <TextBlock Name="Status" Text="{Binding StatusText}" Classes.failed="{Binding IsStatusError}"
+                 FontSize="15" MaxWidth="470" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                 ToolTip.Tip="{Binding StatusText}" motion:Motion.AnimateText="True" />
+      <Button Theme="{StaticResource LinkButton}" Content="查看日志" FontSize="15" Command="{Binding OpenLog}"
+              IsVisible="{Binding CanOpenLog}" VerticalAlignment="Center" />
+    </StackPanel>
+
+    <Grid Grid.Row="3" ColumnDefinitions="*,18,*" motion:Motion.EntranceDelay="110">
+      <Button Theme="{StaticResource FlatButton}" Classes="large" Content="版本选择" Command="{Binding ShowVersions}" />
+      <Button Grid.Column="2" Theme="{StaticResource FlatButton}" Classes="large" Content="版本设置"
+              Command="{Binding ShowInstanceSettings}" IsEnabled="{Binding HasInstance}" />
+    </Grid>
+    <Button Grid.Row="5" Theme="{StaticResource FlatButton}" Classes="large" Content="启动器设置"
+            Command="{Binding ShowLauncherSettings}" motion:Motion.EntranceDelay="140" />
+  </Grid>
+</UserControl>

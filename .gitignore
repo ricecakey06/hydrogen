@@ -1,0 +1,40 @@
+**/bin/
+**/obj/
+.vs/
+.idea/
+TestResults/
+artifacts/
+LauncherData/
+.minecraft/
+*.user
+*.suo
+
+# Test reports and local caches
+coverage/
+*.trx
+*.coverage
+*.coveragexml
+.render-profile/
+*.cache
+
+# Logs, downloads and temporary files
+*.log
+*.tmp
+*.temp
+*.part
+*.bak
+*.orig
+*.rej
+~$*
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+
+# OS metadata
+.DS_Store
+Thumbs.db
+desktop.ini

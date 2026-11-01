@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <AvaloniaResource Include="Assets/**" />
+    <PackageReference Include="Avalonia" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    <ProjectReference Include="../Launcher.Contracts/Launcher.Contracts.csproj" />
+    <ProjectReference Include="../Launcher.Runtime/Launcher.Runtime.csproj" />
+  </ItemGroup>
+</Project>

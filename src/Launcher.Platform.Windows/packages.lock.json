@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "launcher.contracts": {
+        "type": "Project"
+      },
+      "launcher.features": {
+        "type": "Project",
+        "dependencies": {
+          "Launcher.Contracts": "[1.0.0, )",
+          "Launcher.Runtime": "[1.0.0, )"
+        }
+      },
+      "launcher.runtime": {
+        "type": "Project"
+      }
+    }
+  }
+}

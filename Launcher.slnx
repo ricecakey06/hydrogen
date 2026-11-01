@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Launcher.Bootstrap/Launcher.Bootstrap.csproj" />
+    <Project Path="src/Launcher.Contracts/Launcher.Contracts.csproj" />
+    <Project Path="src/Launcher.Downloads/Launcher.Downloads.csproj" />
+    <Project Path="src/Launcher.Features/Launcher.Features.csproj" />
+    <Project Path="src/Launcher.Platform.Windows/Launcher.Platform.Windows.csproj" />
+    <Project Path="src/Launcher.Plugins/Launcher.Plugins.csproj" />
+    <Project Path="src/Launcher.Runtime/Launcher.Runtime.csproj" />
+    <Project Path="src/Launcher.UI/Launcher.UI.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Launcher.Launch.Tests/Launcher.Launch.Tests.csproj" />
+    <Project Path="tests/Launcher.Runtime.Tests/Launcher.Runtime.Tests.csproj" />
+    <Project Path="tests/Launcher.PluginFixtures/Launcher.PluginFixtures.csproj" />
+    <Project Path="tests/Launcher.Plugins.Tests/Launcher.Plugins.Tests.csproj" />
+  </Folder>
+</Solution>

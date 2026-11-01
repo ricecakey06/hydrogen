@@ -1,0 +1,206 @@
+<!-- Hydrogen visual system (DESIGN.md 9.2): flat, MiSans, white controls with a 1.2 px grey stroke and one light shadow. -->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Styles.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://Launcher.UI/Views/SettingEditorViews.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+
+      <!-- MiSans is the specified face. The fallbacks only keep the UI legible where it is not installed. -->
+      <FontFamily x:Key="HydrogenFont">MiSans, Microsoft YaHei UI, PingFang SC, Noto Sans CJK SC</FontFamily>
+      <FontFamily x:Key="ContentControlThemeFontFamily">MiSans, Microsoft YaHei UI, PingFang SC, Noto Sans CJK SC</FontFamily>
+      <CornerRadius x:Key="ControlCornerRadius">6</CornerRadius>
+
+      <SolidColorBrush x:Key="TitleBarBrush" Color="#FFFFFF" />
+      <!-- 20 % white over the system backdrop blur, or a solid light body when no blur is available. -->
+      <SolidColorBrush x:Key="GlassBodyBrush" Color="#33FFFFFF" />
+      <SolidColorBrush x:Key="SolidBodyBrush" Color="#F2F4F6" />
+      <SolidColorBrush x:Key="WindowOutlineBrush" Color="#A6C4C9CE" />
+
+      <SolidColorBrush x:Key="TextPrimaryBrush" Color="#17191C" />
+      <SolidColorBrush x:Key="TextTitleBrush" Color="#202226" />
+      <SolidColorBrush x:Key="TextControlBrush" Color="#25282D" />
+      <SolidColorBrush x:Key="TextSecondaryBrush" Color="#62666E" />
+      <SolidColorBrush x:Key="ErrorTextBrush" Color="#B42318" />
+      <SolidColorBrush x:Key="IconBrush" Color="#303338" />
+      <SolidColorBrush x:Key="LaunchIconBrush" Color="#34373C" />
+      <SolidColorBrush x:Key="FocusStrokeBrush" Color="#34373C" />
+
+      <SolidColorBrush x:Key="ControlFillBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="ControlFillHoverBrush" Color="#F6F7F9" />
+      <SolidColorBrush x:Key="ControlFillPressedBrush" Color="#ECEEF1" />
+      <SolidColorBrush x:Key="ControlStrokeBrush" Color="#CDD1D6" />
+      <SolidColorBrush x:Key="SubtleFillHoverBrush" Color="#1217191C" />
+      <SolidColorBrush x:Key="SubtleFillPressedBrush" Color="#2417191C" />
+
+      <!-- Rectangular buttons: 8 px radius, white, thin grey stroke, shadow 2 px down with a 2 px deviation at 7 %. -->
+      <ControlTheme x:Key="FlatButton" TargetType="Button">
+        <Setter Property="Background" Value="{DynamicResource ControlFillBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextControlBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeBrush}" />
+        <Setter Property="BorderThickness" Value="1.2" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="16,0" />
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="FocusAdorner" Value="{x:Null}" />
+        <!-- The focus ring sits outside the button. -->
+        <Setter Property="ClipToBounds" Value="False" />
+        <Setter Property="Template">
+          <ControlTemplate>
+            <Panel>
+              <Border Name="PART_Body"
+                      Background="{TemplateBinding Background}"
+                      BorderBrush="{TemplateBinding BorderBrush}"
+                      BorderThickness="{TemplateBinding BorderThickness}"
+                      CornerRadius="{TemplateBinding CornerRadius}"
+                      BoxShadow="0 2 4 0 #1218202B">
+                <ContentPresenter Name="PART_ContentPresenter"
+                                  Content="{TemplateBinding Content}"
+                                  ContentTemplate="{TemplateBinding ContentTemplate}"
+                                  Padding="{TemplateBinding Padding}"
+                                  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+              </Border>
+              <Border Name="PART_Focus" Margin="-3" CornerRadius="11" BorderThickness="2"
+                      BorderBrush="{DynamicResource FocusStrokeBrush}" Opacity="0" IsHitTestVisible="False" />
+            </Panel>
+          </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ Border#PART_Body">
+          <Setter Property="Background" Value="{DynamicResource ControlFillHoverBrush}" />
+        </Style>
+        <Style Selector="^:pressed /template/ Border#PART_Body">
+          <Setter Property="Background" Value="{DynamicResource ControlFillPressedBrush}" />
+        </Style>
+        <Style Selector="^:disabled">
+          <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+        </Style>
+        <Style Selector="^:disabled /template/ Border#PART_Body">
+          <Setter Property="Opacity" Value="0.7" />
+        </Style>
+        <Style Selector="^:focus-visible /template/ Border#PART_Focus">
+          <Setter Property="Opacity" Value="1" />
+        </Style>
+      </ControlTheme>
+
+      <!-- The round launch button shares the stroke, fill and shadow of the rectangular buttons. -->
+      <ControlTheme x:Key="LaunchButton" TargetType="Button">
+        <Setter Property="Width" Value="100.8" />
+        <Setter Property="Height" Value="100.8" />
+        <Setter Property="Background" Value="{DynamicResource ControlFillBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource LaunchIconBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeBrush}" />
+        <Setter Property="BorderThickness" Value="1.2" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="FocusAdorner" Value="{x:Null}" />
+        <Setter Property="ClipToBounds" Value="False" />
+        <Setter Property="Template">
+          <ControlTemplate>
+            <Panel>
+              <Border Name="PART_Body"
+                      Background="{TemplateBinding Background}"
+                      BorderBrush="{TemplateBinding BorderBrush}"
+                      BorderThickness="{TemplateBinding BorderThickness}"
+                      CornerRadius="50.4"
+                      BoxShadow="0 2 4 0 #1218202B">
+                <ContentPresenter Name="PART_ContentPresenter"
+                                  Content="{TemplateBinding Content}"
+                                  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+              </Border>
+              <Ellipse Name="PART_Focus" Margin="-4" StrokeThickness="2"
+                       Stroke="{DynamicResource FocusStrokeBrush}" Opacity="0" IsHitTestVisible="False" />
+            </Panel>
+          </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ Border#PART_Body">
+          <Setter Property="Background" Value="{DynamicResource ControlFillHoverBrush}" />
+        </Style>
+        <Style Selector="^:pressed /template/ Border#PART_Body">
+          <Setter Property="Background" Value="{DynamicResource ControlFillPressedBrush}" />
+        </Style>
+        <Style Selector="^:disabled /template/ ContentPresenter#PART_ContentPresenter">
+          <Setter Property="Opacity" Value="0.35" />
+        </Style>
+        <Style Selector="^:focus-visible /template/ Ellipse#PART_Focus">
+          <Setter Property="Opacity" Value="1" />
+        </Style>
+      </ControlTheme>
+
+      <!-- Title bar and page navigation icons: no fill until hovered. -->
+      <ControlTheme x:Key="IconButton" TargetType="Button">
+        <Setter Property="Width" Value="36" />
+        <Setter Property="Height" Value="36" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource IconBrush}" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="FocusAdorner" Value="{x:Null}" />
+        <Setter Property="Template">
+          <ControlTemplate>
+            <Border Name="PART_Body" Background="{TemplateBinding Background}" CornerRadius="6"
+                    BorderThickness="2" BorderBrush="Transparent">
+              <ContentPresenter Content="{TemplateBinding Content}"
+                                HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+            </Border>
+          </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ Border#PART_Body">
+          <Setter Property="Background" Value="{DynamicResource SubtleFillHoverBrush}" />
+        </Style>
+        <Style Selector="^:pressed /template/ Border#PART_Body">
+          <Setter Property="Background" Value="{DynamicResource SubtleFillPressedBrush}" />
+        </Style>
+        <Style Selector="^:focus-visible /template/ Border#PART_Body">
+          <Setter Property="BorderBrush" Value="{DynamicResource FocusStrokeBrush}" />
+        </Style>
+      </ControlTheme>
+
+      <!-- Inline text actions next to status messages. -->
+      <ControlTheme x:Key="LinkButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource TextControlBrush}" />
+        <Setter Property="Padding" Value="2,0" />
+        <Setter Property="FocusAdorner" Value="{x:Null}" />
+        <Setter Property="Template">
+          <ControlTemplate>
+            <Border Name="PART_Body" Background="{TemplateBinding Background}" CornerRadius="4"
+                    BorderThickness="0,0,0,1" BorderBrush="{DynamicResource ControlStrokeBrush}">
+              <ContentPresenter Content="{TemplateBinding Content}" Padding="{TemplateBinding Padding}" />
+            </Border>
+          </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ Border#PART_Body">
+          <Setter Property="BorderBrush" Value="{DynamicResource TextControlBrush}" />
+        </Style>
+        <Style Selector="^:focus-visible /template/ Border#PART_Body">
+          <Setter Property="Background" Value="{DynamicResource SubtleFillHoverBrush}" />
+          <Setter Property="BorderBrush" Value="{DynamicResource FocusStrokeBrush}" />
+        </Style>
+      </ControlTheme>
+    </ResourceDictionary>
+  </Styles.Resources>
+
+  <Style Selector="TextBlock.section">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="Margin" Value="0,20,0,8" />
+  </Style>
+  <Style Selector="TextBlock.caption">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="Margin" Value="0,6,0,0" />
+  </Style>
+  <Style Selector="TextBlock.issue">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+</Styles>

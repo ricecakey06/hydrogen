@@ -1,0 +1,46 @@
+<!-- Motion changes only rendering; the controls' layout and pointer targets remain stable. -->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Style Selector="Button /template/ Border#PART_Body">
+    <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+    <Setter Property="RenderTransform" Value="translate(0px, 0px) scale(1)" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.12" />
+        <BrushTransition Property="BorderBrush" Duration="0:0:0.12" />
+        <DoubleTransition Property="Opacity" Duration="0:0:0.16" />
+        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.14" Easing="CubicEaseOut" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="Button:pointerover /template/ Border#PART_Body">
+    <Setter Property="RenderTransform" Value="translate(0px, -1px) scale(1)" />
+  </Style>
+  <Style Selector="Button.launch:pointerover /template/ Border#PART_Body">
+    <Setter Property="RenderTransform" Value="translate(0px, -2px) scale(1.04)" />
+  </Style>
+  <Style Selector="Button:pressed /template/ Border#PART_Body">
+    <Setter Property="RenderTransform" Value="translate(0px, 1px) scale(0.98)" />
+  </Style>
+  <Style Selector="Button.launch:pressed /template/ Border#PART_Body">
+    <Setter Property="RenderTransform" Value="translate(0px, 1px) scale(0.94)" />
+  </Style>
+  <Style Selector="Button:disabled /template/ Border#PART_Body">
+    <Setter Property="RenderTransform" Value="translate(0px, 0px) scale(1)" />
+  </Style>
+  <Style Selector="Button /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Transitions">
+      <Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.16" /></Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="Button /template/ Border#PART_Focus">
+    <Setter Property="Transitions">
+      <Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.12" /></Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="Button /template/ Ellipse#PART_Focus">
+    <Setter Property="Transitions">
+      <Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.12" /></Transitions>
+    </Setter>
+  </Style>
+</Styles>

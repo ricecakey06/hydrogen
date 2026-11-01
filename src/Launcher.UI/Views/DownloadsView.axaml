@@ -1,0 +1,52 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Launcher.UI.ViewModels"
+             x:Class="Launcher.UI.Views.DownloadsView" x:ClassModifier="internal"
+             x:DataType="vm:DownloadsViewModel">
+  <Grid RowDefinitions="Auto,*,Auto" Margin="24,20,24,24">
+    <StackPanel Spacing="10">
+      <TextBlock Text="{Binding OverallText}" FontSize="17" />
+      <ProgressBar Name="OverallDownloadProgress" Minimum="0" Maximum="100" Value="{Binding OverallPercent}"
+                   IsIndeterminate="{Binding IsIndeterminate}" Height="5" IsVisible="{Binding HasJobs}" />
+      <TextBlock Classes="issue" Text="{Binding Error}" TextWrapping="Wrap"
+                 IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+    </StackPanel>
+    <ScrollViewer Grid.Row="1" Margin="0,18,0,12">
+      <ItemsControl ItemsSource="{Binding Jobs}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:DownloadItemViewModel">
+            <Border BorderBrush="#22000000" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,0,0,14">
+              <StackPanel Spacing="10">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Text="{Binding Name}" FontSize="22" VerticalAlignment="Center"
+                             TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
+                  <Button Grid.Column="1" Theme="{StaticResource LinkButton}" Content="取消" Command="{Binding Cancel}"
+                          IsVisible="{Binding IsActive}" FontSize="14" />
+                  <Button Grid.Column="1" Theme="{StaticResource FlatButton}" Content="重试下载" Command="{Binding Retry}"
+                          IsVisible="{Binding CanRetry}" FontSize="14" Padding="12,6" />
+                </Grid>
+                <TextBlock Text="{Binding GameVersion}" Classes="caption" IsVisible="{Binding HasCustomName}" />
+                <TextBlock Text="{Binding Status}" FontSize="16" />
+                <ProgressBar Minimum="0" Maximum="100" Value="{Binding Percent}" IsIndeterminate="{Binding IsIndeterminate}" Height="4" />
+                <TextBlock Text="{Binding Detail}" Classes="caption" />
+                <TextBlock Text="正在处理的文件" Classes="caption" IsVisible="{Binding HasFiles}" />
+                <ItemsControl ItemsSource="{Binding ActiveFiles}" IsVisible="{Binding HasFiles}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                      <TextBlock Text="{Binding}" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}"
+                                 TextWrapping="Wrap" Margin="0,0,0,5" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="{Binding Error}" Classes="issue" TextWrapping="Wrap"
+                           IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+    <Button Grid.Row="2" Theme="{StaticResource FlatButton}" Content="返回主页" Command="{Binding ShowHome}" Height="44"
+            HorizontalAlignment="Stretch" ToolTip.Tip="下载会继续进行，可从主页右上角返回此页" />
+  </Grid>
+</UserControl>

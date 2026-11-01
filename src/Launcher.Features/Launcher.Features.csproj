@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Launcher.Contracts/Launcher.Contracts.csproj" />
+    <ProjectReference Include="../Launcher.Runtime/Launcher.Runtime.csproj" />
+  </ItemGroup>
+</Project>

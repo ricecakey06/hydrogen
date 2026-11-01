@@ -1,0 +1,84 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sys="using:System"
+             xmlns:vm="using:Launcher.UI.ViewModels"
+             xmlns:motion="using:Launcher.UI.Motion"
+             x:Class="Launcher.UI.Views.InstanceSettingsView"
+             x:ClassModifier="internal"
+             x:DataType="vm:InstanceSettingsViewModel">
+  <Panel>
+  <Grid RowDefinitions="*,Auto" IsEnabled="{Binding !IsConfirmingDelete}">
+    <ScrollViewer Padding="24,0,24,8">
+      <StackPanel>
+        <TextBlock Classes="section" Text="实例名称" />
+        <Grid ColumnDefinitions="*,Auto" IsEnabled="{Binding !IsSaving}">
+          <TextBox Text="{Binding InstanceName, Mode=TwoWay}" MaxLength="64" AutomationProperties.Name="实例名称" />
+          <Button Grid.Column="1" Theme="{StaticResource FlatButton}" Content="重命名" Command="{Binding Rename}" Margin="12,0,0,0" />
+        </Grid>
+        <TextBlock Classes="caption" Text="{Binding GameVersion}" />
+        <TextBlock Classes="section" Text="游戏文件" />
+        <Button Theme="{StaticResource FlatButton}" Content="下载或修复游戏文件" Command="{Binding PrepareFiles}"
+                HorizontalAlignment="Stretch" Height="42" />
+        <TextBlock Classes="caption" Text="复用已校验的文件，只下载缺失或损坏的内容。" />
+        <TextBlock Classes="section" Text="Java" />
+        <ContentControl Content="{Binding Java}" ContentTemplate="{StaticResource JavaSelectorTemplate}" />
+
+        <TextBlock Classes="section" Text="最大内存" />
+        <CheckBox Content="{Binding InheritMemoryLabel}" IsChecked="{Binding InheritMemory}" />
+        <ContentControl Content="{Binding Memory}" ContentTemplate="{StaticResource MemoryEditorTemplate}"
+                        IsEnabled="{Binding !InheritMemory}" Margin="0,8,0,0" />
+
+        <Expander Header="高级 JVM 参数" Margin="0,20,0,0" HorizontalAlignment="Stretch">
+          <StackPanel>
+            <CheckBox Content="跟随启动器设置" IsChecked="{Binding InheritJvmArguments}" />
+            <TextBox Text="{Binding JvmArguments}" IsEnabled="{Binding !InheritJvmArguments}" PlaceholderText="默认留空"
+                     TextWrapping="Wrap" Margin="0,8,0,0" AutomationProperties.Name="JVM 参数" />
+            <TextBlock Classes="caption" Text="不能设置身份、工作目录、classpath 或内存等由启动器管理的参数。" />
+          </StackPanel>
+        </Expander>
+        <TextBlock Classes="section" Text="删除实例" />
+        <Button Theme="{StaticResource FlatButton}" Content="删除此实例" Command="{Binding RequestDelete}"
+                Foreground="{DynamicResource ErrorTextBrush}" HorizontalAlignment="Left" Height="40"
+                IsEnabled="{Binding !IsSaving}" />
+        <TextBlock Classes="caption" Text="删除前需要确认。其他实例和共享游戏文件会保留。" Margin="0,6,0,14" />
+      </StackPanel>
+    </ScrollViewer>
+
+    <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="24,8,24,22">
+      <StackPanel VerticalAlignment="Center">
+        <TextBlock Text="{Binding SavedMessage}" FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}"
+                   IsVisible="{Binding SavedMessage, Converter={x:Static ObjectConverters.IsNotNull}}"
+                   motion:Motion.EntranceDelay="0" motion:Motion.AnimateText="True" />
+        <ItemsControl ItemsSource="{Binding Issues}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="sys:String">
+              <TextBlock Classes="issue" Text="{Binding}" motion:Motion.EntranceDelay="0" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+      <Button Grid.Column="1" Theme="{StaticResource FlatButton}" Content="保存" Width="120" Height="40"
+              Margin="16,0,0,0" Command="{Binding Save}" IsEnabled="{Binding !IsSaving}" />
+    </Grid>
+  </Grid>
+    <Border Background="#66000000" IsVisible="{Binding IsConfirmingDelete}" Padding="24">
+      <Border Background="{DynamicResource SolidBodyBrush}" CornerRadius="12" Padding="24"
+              MaxWidth="460" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <StackPanel Spacing="14" IsEnabled="{Binding !IsSaving}">
+          <TextBlock Text="删除实例？" FontSize="22" />
+          <TextBlock Text="{Binding DeleteName}" FontSize="17" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding DeleteName}" />
+          <TextBlock Text="将删除此实例的配置和独立数据，包括存档、模组及设置。此操作无法撤销。"
+                     TextWrapping="Wrap" FontSize="14" />
+          <TextBlock Text="其他实例、共享游戏文件和旧版共用目录中的数据会保留。"
+                     TextWrapping="Wrap" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" />
+          <Grid ColumnDefinitions="*,*" Margin="0,8,0,0">
+            <Button Theme="{StaticResource FlatButton}" Content="取消" Command="{Binding CancelDelete}"
+                    HorizontalAlignment="Stretch" Height="42" Margin="0,0,6,0" />
+            <Button Grid.Column="1" Theme="{StaticResource FlatButton}" Content="确认删除" Command="{Binding ConfirmDelete}"
+                    Foreground="{DynamicResource ErrorTextBrush}" HorizontalAlignment="Stretch" Height="42" Margin="6,0,0,0" />
+          </Grid>
+        </StackPanel>
+      </Border>
+    </Border>
+  </Panel>
+</UserControl>

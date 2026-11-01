@@ -1,0 +1,47 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Launcher.UI.ViewModels"
+             xmlns:views="using:Launcher.UI.Views"
+             xmlns:motion="using:Launcher.UI.Motion"
+             x:Class="Launcher.UI.Views.LauncherView"
+             x:ClassModifier="internal"
+             x:DataType="vm:LauncherViewModel">
+  <UserControl.KeyBindings>
+    <KeyBinding Gesture="Escape" Command="{Binding GoBack}" />
+  </UserControl.KeyBindings>
+
+  <TransitioningContentControl Content="{Binding CurrentPage}" IsTransitionReversed="{Binding IsHomeVisible}"
+                               HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                               ClipToBounds="True">
+    <TransitioningContentControl.PageTransition>
+      <motion:FadeSlideTransition />
+    </TransitioningContentControl.PageTransition>
+    <TransitioningContentControl.DataTemplates>
+      <!-- Home's view model stays alive, including any active sign-in or launch operation. -->
+      <DataTemplate DataType="vm:HomeViewModel"><views:HomeView /></DataTemplate>
+      <DataTemplate DataType="vm:PageViewModel">
+        <Grid RowDefinitions="Auto,*">
+          <Grid ColumnDefinitions="Auto,*" Margin="14,12,24,0">
+            <Button Theme="{StaticResource IconButton}"
+                    Command="{Binding $parent[views:LauncherView].((vm:LauncherViewModel)DataContext).GoBack}"
+                    AutomationProperties.Name="返回" ToolTip.Tip="返回">
+              <Path Data="M7,0 L0,7 L7,14" Stroke="{DynamicResource IconBrush}" StrokeThickness="2.5"
+                    StrokeLineCap="Round" StrokeJoin="Round" />
+            </Button>
+            <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="22" Margin="8,0,0,0"
+                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" motion:Motion.AnimateText="True" />
+          </Grid>
+          <ContentControl Grid.Row="1" Content="{Binding}" HorizontalContentAlignment="Stretch"
+                          VerticalContentAlignment="Stretch">
+            <ContentControl.DataTemplates>
+              <DataTemplate DataType="vm:VersionsViewModel"><views:VersionsView /></DataTemplate>
+              <DataTemplate DataType="vm:DownloadsViewModel"><views:DownloadsView /></DataTemplate>
+              <DataTemplate DataType="vm:InstanceSettingsViewModel"><views:InstanceSettingsView /></DataTemplate>
+              <DataTemplate DataType="vm:LauncherSettingsViewModel"><views:LauncherSettingsView /></DataTemplate>
+            </ContentControl.DataTemplates>
+          </ContentControl>
+        </Grid>
+      </DataTemplate>
+    </TransitioningContentControl.DataTemplates>
+  </TransitioningContentControl>
+</UserControl>

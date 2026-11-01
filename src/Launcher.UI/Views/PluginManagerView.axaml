@@ -1,0 +1,197 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Launcher.UI.ViewModels"
+             xmlns:motion="using:Launcher.UI.Motion"
+             x:Class="Launcher.UI.Views.PluginManagerView" x:ClassModifier="internal"
+             x:DataType="vm:PluginManagerViewModel" FontWeight="330">
+  <UserControl.Resources>
+    <DataTemplate x:Key="PluginRow" x:DataType="vm:PluginItemViewModel">
+      <Border CornerRadius="11" Background="#85FFFFFF" Margin="0,0,0,6">
+        <Grid ColumnDefinitions="*,Auto" MinHeight="94">
+          <Button Theme="{StaticResource PluginRowButton}" Command="{Binding OpenDetails}"
+                  AutomationProperties.Name="{Binding Info.Name}">
+            <Grid ColumnDefinitions="44,*" Margin="10,10,6,10">
+              <Border Width="40" Height="40" CornerRadius="10" Background="{Binding IconBackground}" VerticalAlignment="Center">
+                <Path Data="{Binding IconGeometry}" Width="23" Height="23" Stretch="Uniform" Stroke="#555F73" StrokeThickness="1.7"
+                      StrokeLineCap="Round" StrokeJoin="Round" />
+              </Border>
+              <StackPanel Grid.Column="1" Margin="8,0,0,0" Spacing="3" VerticalAlignment="Center">
+                <TextBlock Text="{Binding Info.Name}" FontSize="17" FontWeight="330" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding Info.Description}" FontSize="14" Foreground="#68717E"
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding Id}" FontSize="12" Foreground="#7A8392" TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+            </Grid>
+          </Button>
+          <StackPanel Grid.Column="1" Width="80" Margin="0,0,10,0" VerticalAlignment="Center" Spacing="5">
+            <ToggleSwitch IsChecked="{Binding IsEnabled}" IsEnabled="{Binding CanToggle}" IsVisible="{Binding !Info.IsRequired}"
+                          MinWidth="0" OnContent="" OffContent="" HorizontalAlignment="Center"
+                          AutomationProperties.Name="{Binding ToggleLabel}" ToolTip.Tip="重启启动器后生效" />
+            <TextBlock Text="必需" IsVisible="{Binding Info.IsRequired}" FontSize="13" HorizontalAlignment="Center"
+                       Foreground="{DynamicResource TextSecondaryBrush}" ToolTip.Tip="{Binding Info.RequiredReason}" />
+            <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
+              <Ellipse Width="5" Height="5" Fill="{Binding StatusBrush}" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding StatusLabel}" Foreground="{Binding StatusBrush}" FontSize="13" />
+            </StackPanel>
+          </StackPanel>
+        </Grid>
+      </Border>
+    </DataTemplate>
+  </UserControl.Resources>
+
+  <Panel Margin="24,0,24,20">
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+      <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,18">
+        <StackPanel Spacing="6" VerticalAlignment="Center">
+          <TextBlock Text="安装、启用和管理插件" FontSize="18" FontWeight="330" />
+          <TextBlock Text="{Binding Summary}" Classes="plugin-label" />
+        </StackPanel>
+        <Button Grid.Column="1" Theme="{StaticResource IconButton}" Width="34" Height="34" Margin="6,0"
+                Command="{Binding Refresh}" IsEnabled="{Binding !IsBusy}" AutomationProperties.Name="刷新插件列表" ToolTip.Tip="刷新">
+          <Path Data="M19,9 A8,8 0 1 0 20,15 M19,3 V9 H13" Width="18" Height="18" Stretch="Uniform"
+                Stroke="{DynamicResource IconBrush}" StrokeThickness="1.7" StrokeLineCap="Round" StrokeJoin="Round" />
+        </Button>
+        <Button Grid.Column="2" Theme="{StaticResource PluginPrimaryButton}" Content="＋ 安装插件"
+                Command="{Binding OpenInstall}" IsEnabled="{Binding CanInteract}" Height="38" />
+      </Grid>
+
+      <StackPanel Grid.Row="1" Spacing="10">
+        <Border Background="#BFE6E8EC" Padding="3" CornerRadius="8" HorizontalAlignment="Left" IsVisible="{Binding !IsDetail}">
+          <StackPanel Orientation="Horizontal" Spacing="2">
+            <Button Theme="{StaticResource PluginTabButton}" Classes="plugin-tab" Classes.selected="{Binding IsAll}"
+                    Content="{Binding AllLabel}" Command="{Binding ShowAll}" />
+            <Button Theme="{StaticResource PluginTabButton}" Classes="plugin-tab" Classes.selected="{Binding IsBuiltInFilter}"
+                    Content="{Binding BuiltInLabel}" Command="{Binding ShowBuiltIns}" />
+            <Button Theme="{StaticResource PluginTabButton}" Classes="plugin-tab" Classes.selected="{Binding IsInstalledFilter}"
+                    Content="{Binding InstalledLabel}" Command="{Binding ShowInstalled}" />
+          </StackPanel>
+        </Border>
+        <TextBox Text="{Binding SearchQuery}" Classes="plugin-search" PlaceholderText="搜索名称、描述或插件 ID"
+                 IsVisible="{Binding !IsDetail}" AutomationProperties.Name="搜索插件" />
+        <TextBlock Text="{Binding ActionMessage}" FontSize="13" TextWrapping="Wrap" Classes.issue="{Binding IsError}"
+                   IsVisible="{Binding ActionMessage, Converter={x:Static ObjectConverters.IsNotNull}}" motion:Motion.EntranceDelay="0" />
+        <TextBlock Text="{Binding Notice}" Classes="issue" TextWrapping="Wrap"
+                   IsVisible="{Binding Notice, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <Grid Height="3"><ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" Height="2" /></Grid>
+      </StackPanel>
+
+      <TransitioningContentControl Name="PluginListHost" Grid.Row="2" IsVisible="{Binding !IsDetail}"
+                                   Content="{Binding List}" IsTransitionReversed="{Binding IsListTransitionReversed}"
+                                   HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" ClipToBounds="True"
+                                   motion:Motion.EntranceDelay="0">
+        <TransitioningContentControl.PageTransition>
+          <motion:FadeSlideTransition Duration="0:0:0.20" ExitDuration="0:0:0.12" Distance="12" ExitDistance="6" />
+        </TransitioningContentControl.PageTransition>
+        <TransitioningContentControl.ContentTemplate>
+          <DataTemplate x:DataType="vm:PluginListViewModel">
+      <Grid>
+        <ScrollViewer IsVisible="{Binding !IsEmpty}" Padding="0,0,8,0">
+          <StackPanel>
+            <StackPanel IsVisible="{Binding HasBuiltIns}">
+              <TextBlock Text="内置插件" Classes="plugin-group" />
+              <ItemsControl ItemsSource="{Binding BuiltIns}" ItemTemplate="{StaticResource PluginRow}" />
+            </StackPanel>
+            <StackPanel IsVisible="{Binding !IsBuiltInFilter}">
+              <TextBlock Text="已安装的外置插件" Classes="plugin-group" />
+              <ItemsControl ItemsSource="{Binding Installed}" ItemTemplate="{StaticResource PluginRow}" />
+              <TextBlock Text="尚未安装外置插件。可从本地插件包添加扩展。" IsVisible="{Binding !HasInstalled}"
+                         Classes="plugin-label" Margin="0,6,0,16" TextWrapping="Wrap" />
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+        <StackPanel IsVisible="{Binding IsEmpty}" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="420" Margin="12,0,12,16">
+          <Border Width="58" Height="58" CornerRadius="17" Background="#E8ECF3" HorizontalAlignment="Center" Margin="0,0,0,20">
+            <Path Data="M4,5 H11 V3 A3,3 0 0 1 17,3 V5 H24 V12 H26 A3,3 0 0 1 26,18 H24 V25 H17 V23 A3,3 0 0 0 11,23 V25 H4 V18 H6 A3,3 0 0 0 6,12 H4 Z"
+                  Width="27" Height="27" Stretch="Uniform" Stroke="#8C98AC" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" />
+          </Border>
+          <TextBlock Text="{Binding EmptyTitle}" FontSize="20" FontWeight="330" Foreground="#3F4753"
+                     HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
+          <TextBlock Text="{Binding EmptyDescription}" FontSize="14" Foreground="#747E8C" Margin="0,10,0,0" LineHeight="23"
+                     TextWrapping="Wrap" TextAlignment="Center" />
+          <Button Theme="{StaticResource FlatButton}" Content="安装本地插件" Command="{Binding Actions.OpenInstall}"
+                  IsVisible="{Binding ShowEmptyInstallAction}" IsEnabled="{Binding Actions.CanInteract}" FontSize="15"
+                  HorizontalAlignment="Center" Height="38" Margin="0,22,0,0" />
+        </StackPanel>
+      </Grid>
+          </DataTemplate>
+        </TransitioningContentControl.ContentTemplate>
+      </TransitioningContentControl>
+
+      <ScrollViewer Grid.Row="2" IsVisible="{Binding IsDetail}" Padding="0,0,8,0" motion:Motion.EntranceDelay="0">
+        <StackPanel Spacing="16" Margin="0,8,0,0">
+          <Button Theme="{StaticResource LinkButton}" Content="‹ 返回插件列表" Command="{Binding CloseDetails}"
+                  HorizontalAlignment="Left" FontSize="13" />
+          <Border Background="#A6FFFFFF" CornerRadius="14" Padding="20">
+            <StackPanel Spacing="16">
+              <Grid ColumnDefinitions="54,*,Auto">
+                <Border Width="48" Height="48" CornerRadius="12" Background="{Binding SelectedPlugin.IconBackground}">
+                  <Path Data="{Binding SelectedPlugin.IconGeometry}" Width="28" Height="28" Stretch="Uniform"
+                        Stroke="#555F73" StrokeThickness="1.7" StrokeLineCap="Round" StrokeJoin="Round" />
+                </Border>
+                <StackPanel Grid.Column="1" Margin="10,0" Spacing="5" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding SelectedPlugin.Info.Name}" FontSize="22" FontWeight="330" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding SelectedPlugin.Id}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
+                  <ToggleSwitch IsChecked="{Binding SelectedPlugin.IsEnabled}" IsEnabled="{Binding SelectedPlugin.CanToggle}"
+                                IsVisible="{Binding !SelectedPlugin.Info.IsRequired}" MinWidth="0" OnContent="" OffContent=""
+                                AutomationProperties.Name="启用此插件" />
+                  <TextBlock Text="必需" IsVisible="{Binding SelectedPlugin.Info.IsRequired}" HorizontalAlignment="Center" Classes="plugin-label" />
+                  <TextBlock Text="{Binding SelectedPlugin.StatusLabel}" Foreground="{Binding SelectedPlugin.StatusBrush}" FontSize="12" HorizontalAlignment="Center" />
+                </StackPanel>
+              </Grid>
+              <TextBlock Text="{Binding SelectedPlugin.Info.Description}" FontSize="15" TextWrapping="Wrap" LineHeight="25" />
+              <Grid ColumnDefinitions="*,*,*">
+                <StackPanel Spacing="5"><TextBlock Text="来源" Classes="plugin-label" /><TextBlock Text="{Binding SelectedPlugin.OriginLabel}" FontSize="14" /></StackPanel>
+                <StackPanel Grid.Column="1" Spacing="5"><TextBlock Text="版本" Classes="plugin-label" /><TextBlock Text="{Binding SelectedPlugin.Info.Version}" FontSize="14" /></StackPanel>
+                <StackPanel Grid.Column="2" Spacing="5"><TextBlock Text="作者" Classes="plugin-label" /><TextBlock Text="{Binding SelectedPlugin.Info.Author}" FontSize="14" TextWrapping="Wrap" /></StackPanel>
+              </Grid>
+              <Border Background="#0A25282D" CornerRadius="8" Padding="12">
+                <TextBlock Text="{Binding SelectedPlugin.StateDescription}" FontSize="13" TextWrapping="Wrap" />
+              </Border>
+              <TextBlock Text="{Binding SelectedPlugin.Info.RequiredReason}" FontSize="12" TextWrapping="Wrap"
+                         Foreground="{DynamicResource TextSecondaryBrush}" IsVisible="{Binding SelectedPlugin.Info.IsRequired}" />
+            </StackPanel>
+          </Border>
+          <Expander Header="依赖与服务" HorizontalAlignment="Stretch">
+            <StackPanel Spacing="10">
+              <TextBlock Text="依赖插件" Classes="plugin-label" />
+              <SelectableTextBlock Text="{Binding SelectedPlugin.DependenciesText}" FontSize="13" TextWrapping="Wrap" />
+              <TextBlock Text="提供的服务" Classes="plugin-label" />
+              <SelectableTextBlock Text="{Binding SelectedPlugin.ProvidesText}" FontSize="13" TextWrapping="Wrap" />
+            </StackPanel>
+          </Expander>
+          <StackPanel IsVisible="{Binding SelectedPlugin.IsInstalled}" Spacing="12">
+            <TextBlock Text="{Binding SelectedPlugin.Info.Directory}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" />
+            <Button Theme="{StaticResource FlatButton}" Content="卸载插件" Foreground="{DynamicResource ErrorTextBrush}"
+                    HorizontalAlignment="Left" IsVisible="{Binding !SelectedPlugin.Info.IsPendingRemoval}"
+                    IsEnabled="{Binding SelectedPlugin.CanUninstall}" Command="{Binding RequestUninstall}" FontSize="14" />
+            <Button Theme="{StaticResource FlatButton}" Content="撤销卸载" HorizontalAlignment="Left"
+                    IsVisible="{Binding SelectedPlugin.Info.IsPendingRemoval}" IsEnabled="{Binding CanInteract}"
+                    Command="{Binding UndoUninstall}" FontSize="14" />
+            <Border IsVisible="{Binding IsConfirmingRemoval}" Background="#FFF4F1" BorderBrush="#E6C8C1"
+                    BorderThickness="1" CornerRadius="10" Padding="16" motion:Motion.EntranceDelay="0">
+              <StackPanel Spacing="12">
+                <TextBlock Text="确认卸载此插件？重启后移除插件文件，不影响游戏版本和存档。" FontSize="13" TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                  <Button Theme="{StaticResource PluginPrimaryButton}" Content="确认卸载" Command="{Binding ConfirmUninstall}" IsEnabled="{Binding CanInteract}" />
+                  <Button Theme="{StaticResource FlatButton}" Content="取消" Command="{Binding CancelUninstall}" FontSize="14" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+
+      <Grid Grid.Row="3" ColumnDefinitions="*,Auto" Margin="0,16,0,0" MinHeight="34">
+        <TextBlock Text="有待应用的更改 · 重启后生效" IsVisible="{Binding HasPendingChanges}" FontSize="14"
+                   Foreground="#956221" VerticalAlignment="Center" TextWrapping="Wrap" />
+        <TextBlock Text="核心插件受保护，更改重启后生效" IsVisible="{Binding !HasPendingChanges}"
+                   Classes="plugin-label" VerticalAlignment="Center" TextWrapping="Wrap" />
+        <Button Grid.Column="1" Theme="{StaticResource PluginTextButton}" Content="插件目录" Margin="12,0,-8,0"
+                Command="{Binding OpenPluginDirectory}" IsEnabled="{Binding !IsBusy}" />
+      </Grid>
+    </Grid>
+
+  </Panel>
+</UserControl>

@@ -1,0 +1,48 @@
+<!-- Editors shared by the version settings and launcher settings pages. -->
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="using:Launcher.UI.ViewModels"
+                    xmlns:motion="using:Launcher.UI.Motion">
+  <DataTemplate x:Key="JavaSelectorTemplate" x:DataType="vm:JavaSelector">
+    <StackPanel>
+      <ComboBox ItemsSource="{Binding Options}" SelectedItem="{Binding Selected}" HorizontalAlignment="Stretch"
+                AutomationProperties.Name="Java">
+        <ComboBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:JavaOption">
+            <StackPanel Spacing="2">
+              <TextBlock Text="{Binding Title}" FontSize="15" />
+              <TextBlock Text="{Binding Detail}" IsVisible="{Binding HasDetail}" FontSize="12"
+                         Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+          </DataTemplate>
+        </ComboBox.ItemTemplate>
+      </ComboBox>
+      <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,12,0,0">
+        <Button Theme="{StaticResource FlatButton}" Content="重新扫描" Command="{Binding Scan}"
+                IsEnabled="{Binding !IsScanning}" />
+        <Button Theme="{StaticResource FlatButton}" Content="手动选择…" Command="{Binding Choose}" />
+        <TextBlock Text="正在扫描" IsVisible="{Binding IsScanning}" FontSize="14" VerticalAlignment="Center"
+                   motion:Motion.EntranceDelay="0"
+                   Foreground="{DynamicResource TextSecondaryBrush}" />
+      </StackPanel>
+      <TextBlock Classes="issue" Text="{Binding Message}" IsVisible="{Binding HasMessage}" Margin="0,8,0,0"
+                 motion:Motion.EntranceDelay="0" motion:Motion.AnimateText="True" />
+    </StackPanel>
+  </DataTemplate>
+
+  <!-- Minimum and Maximum are bound before Value so the value is never coerced against the default range. -->
+  <DataTemplate x:Key="MemoryEditorTemplate" x:DataType="vm:MemoryEditor">
+    <StackPanel>
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <Slider Minimum="{Binding SliderMinimum}" Maximum="{Binding SliderMaximum}" Value="{Binding SliderValue}"
+                TickFrequency="256" IsSnapToTickEnabled="True" VerticalAlignment="Center"
+                AutomationProperties.Name="最大内存" />
+        <NumericUpDown Grid.Column="1" Width="150" Margin="16,0,8,0"
+                       Minimum="{Binding InputMinimum}" Maximum="{Binding InputMaximum}" Value="{Binding InputValue}"
+                       Increment="256" FormatString="0" AutomationProperties.Name="最大内存（MB）" />
+        <TextBlock Grid.Column="2" Text="MB" VerticalAlignment="Center" />
+      </Grid>
+      <TextBlock Classes="caption" Text="{Binding AdviceText}" />
+    </StackPanel>
+  </DataTemplate>
+</ResourceDictionary>

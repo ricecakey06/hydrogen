@@ -1,0 +1,79 @@
+<!-- Main window (DESIGN.md 9.2–9.4): a 633 × 733 design surface with 26 px corners, a 1 px light outline and no window
+     shadow. The title bar is solid white; the body is transparent over the system backdrop blur when a platform adapter
+     provides one. The whole surface scales uniformly with the window, which keeps the design's aspect ratio.
+     MiSans declares non-standard weights: Regular is 330 and Demibold 450. The design's "400" and "600" mean those
+     faces, so they are requested by their real weights; 400 or 600 would match Demibold and Bold instead. -->
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Launcher.UI.Shell.ShellWindow"
+        Title="Hydrogen"
+        Icon="avares://Launcher.UI/Assets/hydrogen-icon.ico"
+        CanResize="False" CanMaximize="False"
+        WindowDecorations="None"
+        WindowStartupLocation="CenterScreen"
+        Background="Transparent"
+        FontFamily="{DynamicResource HydrogenFont}"
+        FontWeight="330"
+        TextOptions.TextRenderingMode="Antialias"
+        TextOptions.TextHintingMode="Light"
+        TextOptions.BaselinePixelAlignment="Aligned"
+        Foreground="{DynamicResource TextPrimaryBrush}">
+  <Window.Styles>
+    <Style Selector="Border#Body">
+      <Setter Property="Background" Value="{DynamicResource SolidBodyBrush}" />
+    </Style>
+    <Style Selector="Border#Body.glass">
+      <Setter Property="Background" Value="{DynamicResource GlassBodyBrush}" />
+    </Style>
+    <Style Selector="Panel#ResizeGrips > Border">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+  </Window.Styles>
+
+  <Panel>
+    <Viewbox Stretch="Uniform">
+      <Border Width="633" Height="733" CornerRadius="26" BorderThickness="1"
+              BorderBrush="{DynamicResource WindowOutlineBrush}" ClipToBounds="True">
+        <Panel>
+        <Grid Name="ChromeAndPages" RowDefinitions="52,*">
+          <!-- Only the empty part of the title bar drags the window; the caption buttons keep their own hit areas. -->
+          <Grid Name="TitleBar" Background="{DynamicResource TitleBarBrush}" ColumnDefinitions="*,Auto,Auto">
+            <TextBlock Text="Hydrogen" FontSize="28" Margin="19,0,0,0" VerticalAlignment="Center"
+                       Foreground="{DynamicResource TextTitleBrush}" />
+            <Button Grid.Column="1" Name="MinimizeButton" Theme="{StaticResource IconButton}"
+                    Margin="0,10.5,2,0" VerticalAlignment="Top"
+                    AutomationProperties.Name="最小化" ToolTip.Tip="最小化">
+              <Path Data="M0,0 H21" Stroke="{DynamicResource IconBrush}" StrokeThickness="2.5" StrokeLineCap="Round" />
+            </Button>
+            <Button Grid.Column="2" Name="CloseButton" Theme="{StaticResource IconButton}"
+                    Margin="0,10.5,11.5,0" VerticalAlignment="Top"
+                    AutomationProperties.Name="关闭" ToolTip.Tip="关闭">
+              <Path Data="M0,0 L15,15 M15,0 L0,15" Stroke="{DynamicResource IconBrush}" StrokeThickness="2.5" StrokeLineCap="Round" />
+            </Button>
+          </Grid>
+          <Border Grid.Row="1" Name="Body">
+            <ContentControl Name="Slot" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
+          </Border>
+        </Grid>
+        <!-- The modal covers the complete design surface, including the title bar. -->
+        <Border Name="ModalLayer" Background="#660F131B" CornerRadius="25" IsVisible="False">
+          <ContentControl Name="ModalSlot" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                          Focusable="True" KeyboardNavigation.TabNavigation="Cycle" />
+        </Border>
+        </Panel>
+      </Border>
+    </Viewbox>
+
+    <!-- Resize grips in window units, so they keep their size at every scale. Corners sit inside the rounded outline. -->
+    <Panel Name="ResizeGrips">
+      <Border Name="GripLeft" Width="6" HorizontalAlignment="Left" Margin="0,14" />
+      <Border Name="GripRight" Width="6" HorizontalAlignment="Right" Margin="0,14" />
+      <Border Name="GripTop" Height="5" VerticalAlignment="Top" Margin="14,0" />
+      <Border Name="GripBottom" Height="6" VerticalAlignment="Bottom" Margin="14,0" />
+      <Border Name="GripTopLeft" Width="14" Height="14" HorizontalAlignment="Left" VerticalAlignment="Top" />
+      <Border Name="GripTopRight" Width="14" Height="14" HorizontalAlignment="Right" VerticalAlignment="Top" />
+      <Border Name="GripBottomLeft" Width="14" Height="14" HorizontalAlignment="Left" VerticalAlignment="Bottom" />
+      <Border Name="GripBottomRight" Width="14" Height="14" HorizontalAlignment="Right" VerticalAlignment="Bottom" />
+    </Panel>
+  </Panel>
+</Window>

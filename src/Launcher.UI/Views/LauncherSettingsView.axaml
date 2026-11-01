@@ -1,0 +1,126 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sys="using:System"
+             xmlns:vm="using:Launcher.UI.ViewModels"
+             xmlns:views="using:Launcher.UI.Views"
+             xmlns:motion="using:Launcher.UI.Motion"
+             x:Class="Launcher.UI.Views.LauncherSettingsView"
+             x:ClassModifier="internal"
+             x:DataType="vm:LauncherSettingsViewModel">
+  <Grid RowDefinitions="Auto,*">
+    <Border Background="#BFE6E8EC" CornerRadius="8" Padding="3" HorizontalAlignment="Left" Margin="24,12,24,18">
+      <StackPanel Orientation="Horizontal" Spacing="2">
+        <Button Theme="{StaticResource PluginTabButton}" Classes="plugin-tab" Classes.selected="{Binding IsGeneral}"
+                Width="100" Content="常规" Command="{Binding ShowGeneral}" />
+        <Button Theme="{StaticResource PluginTabButton}" Classes="plugin-tab" Classes.selected="{Binding IsPlugins}"
+                Width="100" Content="插件" Command="{Binding ShowPlugins}" />
+      </StackPanel>
+    </Border>
+    <Panel Grid.Row="1" IsVisible="{Binding IsPlugins}" motion:Motion.EntranceDelay="0">
+      <views:PluginManagerView DataContext="{Binding Plugins}" />
+    </Panel>
+    <Grid Grid.Row="1" RowDefinitions="*,Auto" IsVisible="{Binding IsGeneral}" motion:Motion.EntranceDelay="0">
+    <ScrollViewer Padding="24,0,24,8">
+      <StackPanel>
+        <TextBlock Classes="section" Text="账号" />
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Text="{Binding AccountText}" FontSize="16" VerticalAlignment="Center" />
+          <Panel Grid.Column="1" IsVisible="{Binding !IsOfflineMode}">
+            <Button Theme="{StaticResource FlatButton}" Content="退出登录" Command="{Binding SignOut}"
+                    IsVisible="{Binding IsSignedIn}" />
+            <Button Theme="{StaticResource FlatButton}" Content="登录" Command="{Binding SignIn}"
+                    IsVisible="{Binding CanSignIn}" />
+          </Panel>
+        </Grid>
+        <TextBlock Classes="caption" Text="{Binding AccountHint}" />
+        <StackPanel IsVisible="{Binding IsOfflineMode}" Margin="0,12,0,0" Spacing="6">
+          <TextBlock Text="离线名称" FontSize="14" />
+          <Grid ColumnDefinitions="*,Auto" IsEnabled="{Binding CanEditOfflineName}">
+            <TextBox Text="{Binding OfflinePlayerName, Mode=TwoWay}" MaxLength="16" AutomationProperties.Name="离线名称" />
+            <Button Grid.Column="1" Theme="{StaticResource FlatButton}" Content="保存名称" Margin="12,0,0,0"
+                    Command="{Binding SaveOfflineName}" />
+          </Grid>
+          <TextBlock Classes="caption" Text="3–16 位英文字母、数字或下划线，保存后用于下次启动。" />
+          <TextBlock Classes="issue" Text="{Binding OfflineNameIssue}"
+                     IsVisible="{Binding OfflineNameIssue, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        </StackPanel>
+
+        <StackPanel IsVisible="{Binding HasGameDownloads}">
+          <TextBlock Classes="section" Text="游戏下载源" />
+          <ComboBox SelectedIndex="{Binding DownloadSourceIndex}" HorizontalAlignment="Stretch" AutomationProperties.Name="游戏下载源">
+            <ComboBoxItem>官方源（Mojang）</ComboBoxItem>
+            <ComboBoxItem>BMCLAPI（bangbang93）</ComboBoxItem>
+          </ComboBox>
+          <TextBlock Classes="caption" Text="{Binding DownloadSourceHint}" />
+          <Button Theme="{StaticResource LinkButton}" Content="查看 BMCLAPI 文档" Command="{Binding OpenBmclapiDocs}"
+                  HorizontalAlignment="Left" Margin="0,6,0,0" IsVisible="{Binding IsBmclapiSource}" FontSize="14" />
+        </StackPanel>
+
+        <TextBlock Classes="section" Text="Java" />
+        <ContentControl Content="{Binding Java}" ContentTemplate="{StaticResource JavaSelectorTemplate}" />
+
+        <TextBlock Classes="section" Text="最大内存" />
+        <ContentControl Content="{Binding Memory}" ContentTemplate="{StaticResource MemoryEditorTemplate}" />
+
+        <TextBlock Classes="section" Text="游戏窗口" />
+        <ComboBox SelectedIndex="{Binding WindowModeIndex}" HorizontalAlignment="Stretch" AutomationProperties.Name="游戏窗口">
+          <ComboBoxItem>游戏默认</ComboBoxItem>
+          <ComboBoxItem>自定义尺寸</ComboBoxItem>
+          <ComboBoxItem>全屏</ComboBoxItem>
+        </ComboBox>
+        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0" IsVisible="{Binding IsCustomWindow}"
+                    motion:Motion.EntranceDelay="0">
+          <NumericUpDown Width="140" Minimum="320" Maximum="7680" Increment="10" FormatString="0"
+                         Value="{Binding WindowWidth}" AutomationProperties.Name="窗口宽度" />
+          <TextBlock Text="×" VerticalAlignment="Center" />
+          <NumericUpDown Width="140" Minimum="240" Maximum="4320" Increment="10" FormatString="0"
+                         Value="{Binding WindowHeight}" AutomationProperties.Name="窗口高度" />
+        </StackPanel>
+
+        <TextBlock Classes="section" Text="启动后" />
+        <ComboBox SelectedIndex="{Binding AfterLaunchIndex}" HorizontalAlignment="Stretch" AutomationProperties.Name="启动后">
+          <ComboBoxItem>最小化启动器，游戏退出后恢复</ComboBoxItem>
+          <ComboBoxItem>保持启动器窗口</ComboBoxItem>
+        </ComboBox>
+
+        <TextBlock Classes="section" Text="数据目录" />
+        <Grid ColumnDefinitions="*,Auto">
+          <SelectableTextBlock Text="{Binding DataDirectory}" FontSize="14" TextWrapping="Wrap" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Theme="{StaticResource FlatButton}" Content="更改…" Margin="12,0,0,0"
+                  Command="{Binding ChangeDataDirectory}" />
+        </Grid>
+        <TextBlock Classes="caption" Text="更改位置不会移动或删除已有数据。" />
+        <TextBlock Classes="caption" Text="游戏目录" Margin="0,8,0,0" />
+        <SelectableTextBlock Text="{Binding GameDirectory}" FontSize="14" TextWrapping="Wrap" />
+        <TextBlock Classes="issue" Text="{Binding DataDirectoryIssue}" IsVisible="{Binding HasDataDirectoryIssue}"
+                   Margin="0,6,0,0" motion:Motion.EntranceDelay="0" motion:Motion.AnimateText="True" />
+
+        <Expander Header="高级 JVM 参数" Margin="0,20,0,0" HorizontalAlignment="Stretch">
+          <StackPanel>
+            <TextBox Text="{Binding JvmArguments}" PlaceholderText="默认留空" TextWrapping="Wrap"
+                     AutomationProperties.Name="JVM 参数" />
+            <TextBlock Classes="caption" Text="不能设置身份、工作目录、classpath 或内存等由启动器管理的参数。" />
+          </StackPanel>
+        </Expander>
+      </StackPanel>
+    </ScrollViewer>
+
+    <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="24,8,24,22">
+      <StackPanel VerticalAlignment="Center">
+        <TextBlock Text="{Binding SavedMessage}" FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}"
+                   IsVisible="{Binding SavedMessage, Converter={x:Static ObjectConverters.IsNotNull}}"
+                   motion:Motion.EntranceDelay="0" motion:Motion.AnimateText="True" />
+        <ItemsControl ItemsSource="{Binding Issues}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="sys:String">
+              <TextBlock Classes="issue" Text="{Binding}" motion:Motion.EntranceDelay="0" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+      <Button Grid.Column="1" Theme="{StaticResource FlatButton}" Content="保存" Width="120" Height="40"
+              Margin="16,0,0,0" Command="{Binding Save}" IsEnabled="{Binding !IsSaving}" />
+    </Grid>
+    </Grid>
+  </Grid>
+</UserControl>
