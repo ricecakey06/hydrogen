@@ -97,3 +97,49 @@ jobs:
           path: artifacts/publish/win-x64/Launcher.exe
           if-no-files-found: error
           retention-days: 14
+
+  release:
+    name: Publish release
+    needs: windows-package
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: write
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download the tested Windows executable
+        uses: actions/download-artifact@v8
+        with:
+          name: Hydrogen-win-x64
+          path: release
+      - name: Check executable and generate checksum
+        run: |
+          test -s release/Launcher.exe
+          cd release
+          sha256sum Launcher.exe > SHA256SUMS.txt
+      - name: Set initial release version
+        id: version
+        run: |
+          version=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --exclude-pre-releases --limit 100 --json tagName --jq 'if length == 0 then "0.1.0" else "" end')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Draft release notes
+        id: draft
+        uses: release-drafter/release-drafter@v7
+        with:
+          version: ${{ steps.version.outputs.version }}
+          commitish: ${{ github.sha }}
+          publish: false
+          footer: |
+            ## Build / 构建来源
+            [GitHub Actions #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            Commit: `${{ github.sha }}`
+      - name: Attach assets and publish
+        env:
+          RELEASE_TAG: ${{ steps.draft.outputs.tag_name }}
+        run: |
+          gh release upload "$RELEASE_TAG" release/Launcher.exe release/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest

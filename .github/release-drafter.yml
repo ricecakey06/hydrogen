@@ -1,0 +1,27 @@
+name-template: 'Hydrogen v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+tag-prefix: 'v'
+change-template: '- $TITLE (#$NUMBER)'
+no-changes-template: '- 直接提交或维护更新，详见构建来源对应的提交。 / Direct commits or maintenance updates; see the build commit.'
+template: |
+  ## 下载与使用 / Download and use
+
+  下载 `Launcher.exe`，放入可写目录后运行。此版本为 Windows x64 自包含单文件程序，无需另外安装 .NET；启动游戏仍需兼容的 Java。
+
+  Download `Launcher.exe` and run it from a writable directory. This is a self-contained Windows x64 application: no separate .NET runtime is required, but the game still needs a compatible Java runtime.
+
+  微软登录需要有效的 Microsoft Client ID，可通过环境变量 `HYDROGEN_MICROSOFT_CLIENT_ID` 配置。离线模式可在插件管理中启用，重启后生效。
+
+  Microsoft sign-in requires a valid Client ID, configurable through `HYDROGEN_MICROSOFT_CLIENT_ID`. Offline mode can be enabled in plugin management and takes effect after a restart.
+
+  ## 更新 / Changes
+
+  $CHANGES
+
+  ## 声明 / Notice
+
+  本项目主要由 AI 编写，因此不保证长期可用性和稳定性。
+
+  This project is primarily written by AI, so its long-term usability and stability are not guaranteed.
+
+  License: MIT. `SHA256SUMS.txt` contains the SHA-256 checksum of `Launcher.exe`.
