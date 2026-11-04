@@ -1,0 +1,12 @@
+[package]
+name = "hydrogen-diagnostics"
+version = "1.0.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+hydrogen-plugin-sdk = { path = "../../plugin-sdk/native" }
+uuid = { version = "1", features = ["v4"] }

@@ -1,0 +1,9 @@
+[package]
+name = "hydrogen-example-services"
+version = "1.0.0"
+edition = "2024"
+license = "MIT"
+[lib]
+crate-type = ["cdylib"]
+[dependencies]
+hydrogen-plugin-sdk = { path = "../../plugin-sdk/native" }

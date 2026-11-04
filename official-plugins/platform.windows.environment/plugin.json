@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 1,
+  "id": "platform.windows.environment",
+  "name": "Windows 环境",
+  "description": "独立文件选择、系统浏览器、目录与磁盘空间服务。",
+  "version": "1.0.0",
+  "runtime": "native",
+  "entry": "bin/plugin.dll",
+  "permissions": [
+    "native.code"
+  ],
+  "provides": [
+    {
+      "id": "platform.windows.environment",
+      "version": "1.0.0",
+      "methods": [
+        "choose",
+        "browser",
+        "openFolder",
+        "openText",
+        "availableSpace",
+        "osVersion"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 1,
+  "id": "minecraft.content",
+  "name": "游戏内容",
+  "version": "1.0.0",
+  "runtime": "native",
+  "entry": "bin/plugin.dll",
+  "permissions": [
+    "native.code"
+  ],
+  "dependencies": [
+    {
+      "id": "network",
+      "version": "^1",
+      "optional": false
+    },
+    {
+      "id": "minecraft.files",
+      "version": "^1",
+      "optional": false
+    },
+    {
+      "id": "minecraft.download",
+      "version": "^1",
+      "optional": true
+    },
+    {
+      "id": "platform.windows.environment",
+      "version": "^1",
+      "optional": false
+    }
+  ],
+  "provides": [
+    {
+      "id": "minecraft.content",
+      "version": "1.0.0",
+      "methods": [
+        "supported",
+        "allows",
+        "versions",
+        "resolve",
+        "poll",
+        "cancel"
+      ]
+    }
+  ]
+}

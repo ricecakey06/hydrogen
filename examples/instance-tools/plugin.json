@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 1,
+  "id": "example.instance-tools",
+  "name": "实例工具",
+  "version": "1.0.0",
+  "runtime": "javascript",
+  "entry": "main.js",
+  "activation": ["command:show-count"],
+  "dependencies": [],
+  "permissions": ["instances.read", "ui.contribute", "ui.panel"],
+  "contributes": {
+    "commands": [{ "id": "show-count", "title": "查看实例数量" }],
+    "panels": [{ "id": "overview", "title": "实例概览", "entry": "ui/index.html" }]
+  }
+}

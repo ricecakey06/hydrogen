@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 1,
+  "id": "ui.shell",
+  "name": "窗口与外壳",
+  "version": "1.0.0",
+  "runtime": "native",
+  "entry": "bin/plugin.dll",
+  "permissions": [
+    "native.code",
+    "ui.host"
+  ],
+  "dependencies": [
+    {
+      "id": "ui.launcher",
+      "version": "^1",
+      "optional": true
+    },
+    {
+      "id": "plugins.manager",
+      "version": "^1",
+      "optional": true
+    }
+  ],
+  "frontend": {
+    "entry": "assets/entry.js",
+    "styles": [
+      "assets/main.css"
+    ]
+  }
+}

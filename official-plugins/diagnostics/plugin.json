@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 1,
+  "id": "diagnostics",
+  "name": "诊断日志",
+  "description": "独立有界日志写入与敏感值脱敏服务。",
+  "version": "1.0.0",
+  "runtime": "native",
+  "entry": "bin/plugin.dll",
+  "permissions": [
+    "native.code"
+  ],
+  "provides": [
+    {
+      "id": "diagnostics",
+      "version": "1.0.0",
+      "methods": [
+        "create",
+        "append",
+        "close"
+      ]
+    }
+  ]
+}

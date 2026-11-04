@@ -1,0 +1,33 @@
+import { invoke } from '@tauri-apps/api/core';
+
+export interface Overrides { java: string | null; maxMemoryMib: number | null; jvmArguments: string | null }
+export interface Components { loader: string; fabricApi: string | null }
+export interface InstanceInfo { id: string; name: string; gameVersion: string; isInstalled: boolean; overrides: Overrides; components: Components | null; directoryName: string | null; loaderName: string }
+export interface Settings { gameDirectory: string | null; isolateGameDirectory: boolean | null; java: string | null; maxMemoryMib: number; windowMode: string; windowWidth: number; windowHeight: number; afterLaunch: string; jvmArguments: string; downloadSource: string; offlineEnabled: boolean; offlinePlayerName: string; accountMode: string; microsoftClientId: string; modules: Record<string, boolean> }
+export interface JavaRuntime { path: string; version: string; major: number; architecture: string }
+export interface DownloadProgress { completed: number; total: number | null; completedFiles: number; totalFiles: number; activeFiles: string[] }
+export interface CrashCause { id: string; title: string; summary: string; suggestions: string[]; evidence: string[] }
+export interface CrashReport { id: string; createdAt: number; exitCode: number; instanceName: string; gameVersion: string; javaVersion: string; javaArchitecture: string; maxMemoryMib: number; logPath: string; causes: CrashCause[]; files: string[]; notes: string[] }
+export interface Task { id: string; instanceId: string | null; instanceName: string | null; gameVersion: string | null; kind: string; phase: string; message: string; completed: number; total: number | null; download: DownloadProgress | null; sequence: number; startedAt: number; logPath: string | null; exitCode: number | null; crashReport?: CrashReport | null; crashError?: string | null }
+export interface Profile { id: string; kind: 'microsoft' | 'offline'; name: string; uuid: string | null; skin?: string | null }
+export interface Account { profiles: Profile[]; selectedProfileId: string | null; status: string; playerName: string | null; mode: string; offlineAvailable: boolean; detail: string | null; skin: string | null }
+export interface GameVersion { id: string; releaseTime: string }
+export interface ModInfo { id: string; englishName: string; chineseName: string | null; version: string; summary: string; kind: string; fileName: string | null; sha1: string | null; enabled: boolean; icon: string | null; problem: string | null }
+export interface ModRef { fileName: string; sha1: string }
+export interface PluginInfo {
+  id: string; name: string; version: string; digest: string; permissions: string[];
+  commands: { id: string; title: string }[];
+  panels: { id: string; title: string; entry: string }[];
+  runtime: 'javascript' | 'native';
+  description: string; origin: 'builtIn' | 'development' | 'installed'; required: boolean; enabled: boolean; problem: string; dependencies: (string | { id: string; version?: string })[];
+}
+export interface Snapshot { stage: string; version: string; instances: InstanceInfo[]; selectedInstanceId: string; settings: Settings; javaRuntimes: JavaRuntime[]; account: Account; tasks: Task[]; dataDirectory: string; gameDirectory: string; notice: string | null; readOnly: boolean; memory: { totalMib: number; recommendedMib: number }; plugins: PluginInfo[]; webviewVersion: string; appearance: { material: 'blur' | 'solid'; reason: string; rounded: boolean } }
+export function action<T = void>(type: string, fields: Record<string, unknown> = {}): Promise<T> { return invoke<T>('launcher_action', { action: { type, ...fields } }); }
+export function taskActive(task: Task) { return !['completed', 'failed', 'cancelled', 'exited'].includes(task.phase); }
+export interface RunReport { pluginId: string; generation: number; result: unknown; notifications: string[]; heapBytes: number; registrations: number }
+export interface PanelSession { sessionId: string; nonce: string; url: string; generation: number }
+export { invoke };
+export function errorMessage(error: unknown): string {
+  if (error && typeof error === 'object' && 'message' in error) return String(error.message);
+  return String(error);
+}

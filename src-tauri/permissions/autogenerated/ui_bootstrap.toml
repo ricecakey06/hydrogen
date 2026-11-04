@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ui-bootstrap"
+description = "Enables the ui_bootstrap command without any pre-configured scope."
+commands.allow = ["ui_bootstrap"]
+
+[[permission]]
+identifier = "deny-ui-bootstrap"
+description = "Denies the ui_bootstrap command without any pre-configured scope."
+commands.deny = ["ui_bootstrap"]

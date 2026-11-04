@@ -1,0 +1,9 @@
+[package]
+name = "hydrogen-plugins-manager"
+version = "1.0.0"
+edition = "2024"
+[lib]
+crate-type = ["cdylib"]
+[dependencies]
+hydrogen-plugin-sdk = { path = "../../plugin-sdk/native" }
+serde_json = "1"

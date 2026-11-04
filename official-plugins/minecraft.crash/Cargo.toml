@@ -1,0 +1,20 @@
+[package]
+name = "hydrogen-minecraft-crash"
+version = "1.0.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+hydrogen-plugin-sdk = { path = "../../plugin-sdk/native" }
+hydrogen-plugin-services = { path = "../../plugin-sdk/services" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+regex = "1"
+uuid = { version = "1", features = ["v4"] }
+zip = { version = "6", default-features = false, features = ["deflate"] }
+
+[dev-dependencies]
+tempfile = "3"

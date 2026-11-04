@@ -1,0 +1,15 @@
+[package]
+name = "hydrogen-platform-windows-environment"
+version = "1.0.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+hydrogen-plugin-sdk = { path = "../../plugin-sdk/native" }
+url = "2"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = ["Win32_UI_Shell", "Win32_System_Com", "Win32_UI_WindowsAndMessaging", "Win32_Storage_FileSystem"] }

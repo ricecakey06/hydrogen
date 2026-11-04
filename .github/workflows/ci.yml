@@ -1,0 +1,169 @@
+name: Build and test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    name: Build and test (${{ matrix.os }})
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          components: rustfmt
+      - name: Restore frontend dependencies
+        run: npm ci
+      - name: Check and build frontend packages
+        run: npm run build
+      - name: Run frontend tests
+        run: npm test
+      - name: Check Rust formatting
+        run: |
+          cargo fmt --manifest-path src-tauri/Cargo.toml --check
+          cargo fmt --manifest-path official-plugins/Cargo.toml --all --check
+          cargo fmt --manifest-path plugin-sdk/native/Cargo.toml --check
+      - name: Build native plugins
+        run: cargo build --manifest-path official-plugins/Cargo.toml --locked
+      - name: Test native plugins
+        run: cargo test --manifest-path official-plugins/Cargo.toml --workspace --locked
+      - name: Test plugin SDKs
+        run: cargo test --manifest-path official-plugins/Cargo.toml --locked -p hydrogen-plugin-sdk -p hydrogen-plugin-services
+      - name: Test host without desktop dependencies
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --no-default-features
+      - name: Test desktop integration
+        if: runner.os == 'Windows'
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+
+  windows-package:
+    name: Package Windows x64
+    needs: test
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - name: Restore frontend dependencies
+        run: npm ci
+      - name: Build frontend packages
+        run: npm run build
+      - name: Build Release plugins
+        run: cargo build --manifest-path official-plugins/Cargo.toml --release --locked
+      - name: Build standalone executable
+        run: cargo build --manifest-path src-tauri/Cargo.toml --release --locked --features custom-protocol --bin Launcher
+      - name: Check packaged startup and bundled plugins
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path -LiteralPath src-tauri/target/release/Launcher.exe).Path
+          $check = Start-Process -FilePath $exe -ArgumentList '--check' -WindowStyle Hidden -PassThru
+          if (-not $check.WaitForExit(30000)) {
+            Stop-Process -Id $check.Id -ErrorAction SilentlyContinue
+            throw 'Packaged startup check timed out.'
+          }
+          if ($check.ExitCode -ne 0) { throw 'Packaged startup check failed.' }
+
+          # --check only checks WebView2; start the packaged UI to verify plugin deployment.
+          $probe = Join-Path $env:RUNNER_TEMP 'hydrogen-startup'
+          New-Item -ItemType Directory -Path $probe | Out-Null
+          $ready = Join-Path $probe 'ready.json'
+          $arguments = @('--data-dir', "`"$probe/data`"", '--benchmark-ready-file', "`"$ready`"", '--benchmark-webview-data', "`"$probe/webview`"")
+          $process = Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
+          try {
+            $deadline = [DateTime]::UtcNow.AddSeconds(60)
+            while (-not (Test-Path -LiteralPath $ready)) {
+              if ($process.HasExited) { throw 'Packaged UI exited before becoming ready.' }
+              if ([DateTime]::UtcNow -ge $deadline) { throw 'Packaged UI startup timed out.' }
+              Start-Sleep -Milliseconds 250
+            }
+            $null = Get-Content -LiteralPath $ready -Raw | ConvertFrom-Json
+            $index = Get-Content -LiteralPath official-plugins/distribution.json -Raw | ConvertFrom-Json
+            foreach ($id in $index.PSObject.Properties.Name) {
+              $plugin = Join-Path $probe "data/plugins/$id"
+              $manifest = Get-Content -LiteralPath (Join-Path $plugin 'plugin.json') -Raw | ConvertFrom-Json
+              if (-not (Test-Path -LiteralPath (Join-Path $plugin $manifest.entry) -PathType Leaf)) {
+                throw "Bundled plugin entry is missing: $id"
+              }
+            }
+          } finally {
+            if (-not $process.HasExited) { Stop-Process -Id $process.Id -ErrorAction SilentlyContinue }
+          }
+      - name: Upload Windows executable
+        uses: actions/upload-artifact@v7
+        with:
+          name: Hydrogen-win-x64
+          path: src-tauri/target/release/Launcher.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish release
+    needs: windows-package
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: write
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download the tested Windows executable
+        uses: actions/download-artifact@v8
+        with:
+          name: Hydrogen-win-x64
+          path: release
+      - name: Check executable and generate checksum
+        run: |
+          test -s release/Launcher.exe
+          cd release
+          sha256sum Launcher.exe > SHA256SUMS.txt
+      - name: Set initial release version
+        id: version
+        run: |
+          initial=$(jq -r .version package.json)
+          version=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --exclude-pre-releases --limit 100 --json tagName --jq "if length == 0 then \"$initial\" else \"\" end")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Draft release notes
+        id: draft
+        uses: release-drafter/release-drafter@v7
+        with:
+          version: ${{ steps.version.outputs.version }}
+          commitish: ${{ github.sha }}
+          publish: false
+      - name: Attach assets and publish
+        env:
+          RELEASE_TAG: ${{ steps.draft.outputs.tag_name }}
+        run: |
+          gh release upload "$RELEASE_TAG" release/Launcher.exe release/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest

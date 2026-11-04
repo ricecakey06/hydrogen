@@ -1,0 +1,31 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "Only the bundled main document receives application commands and window controls.",
+  "local": true,
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "allow-app-snapshot",
+    "allow-launcher-action",
+    "allow-instance-select",
+    "allow-plugin-run",
+    "allow-plugin-reload",
+    "allow-panel-open",
+    "allow-panel-call",
+    "allow-panel-close",
+    "allow-ui-ready",
+    "core:window:allow-minimize",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "core:window:allow-inner-size",
+    "core:window:allow-outer-position",
+    "core:window:allow-scale-factor",
+    "core:window:allow-set-size",
+    "core:window:allow-set-position",
+    "allow-ui-bootstrap"
+  ]
+}

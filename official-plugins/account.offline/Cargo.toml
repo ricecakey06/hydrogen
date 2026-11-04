@@ -1,0 +1,13 @@
+[package]
+name = "hydrogen-account-offline"
+version = "1.0.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+hydrogen-plugin-sdk = { path = "../../plugin-sdk/native" }
+md-5 = "0.10"
+uuid = "1"

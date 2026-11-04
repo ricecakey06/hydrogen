@@ -1,0 +1,55 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Hydrogen",
+  "version": "0.2.7",
+  "identifier": "io.hydrogen.launcher.next",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Hydrogen",
+        "create": false,
+        "width": 1000,
+        "height": 714,
+        "minWidth": 600,
+        "minHeight": 428,
+        "resizable": false,
+        "maximizable": false,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "center": true,
+        "backgroundColor": "#00000000"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' http://hydrogen-ui.localhost hydrogen-ui:; style-src 'self' http://hydrogen-ui.localhost hydrogen-ui: 'unsafe-inline'; img-src 'self' http://hydrogen-ui.localhost hydrogen-ui: data:; font-src 'self' http://hydrogen-ui.localhost hydrogen-ui:; connect-src ipc: http://ipc.localhost; frame-src http://hydrogen-plugin.localhost hydrogen-plugin:; object-src 'none'; base-uri 'none'; form-action 'none'",
+      "devCsp": "default-src 'self'; script-src 'self' http://hydrogen-ui.localhost hydrogen-ui: 'unsafe-inline'; style-src 'self' http://hydrogen-ui.localhost hydrogen-ui: 'unsafe-inline'; img-src 'self' http://hydrogen-ui.localhost hydrogen-ui: data:; connect-src ipc: http://ipc.localhost http://127.0.0.1:1420 ws://127.0.0.1:1420; frame-src http://hydrogen-plugin.localhost hydrogen-plugin:; object-src 'none'; base-uri 'none'; form-action 'none'",
+      "capabilities": [
+        "main"
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "skip"
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 1,
+  "id": "minecraft.crash",
+  "name": "游戏崩溃分析",
+  "description": "分析本次游戏异常退出的日志，提供可能原因、处理建议和可导出的脱敏崩溃报告。",
+  "version": "1.0.0",
+  "runtime": "native",
+  "entry": "bin/plugin.dll",
+  "permissions": ["native.code"],
+  "provides": [
+    { "id": "minecraft.crash", "version": "1.0.0", "methods": ["analyze", "export"] }
+  ]
+}

@@ -1,0 +1,35 @@
+node_modules/
+.build/
+dist/
+**/target/
+src-tauri/gen/
+artifacts/
+official-plugins/ui.shell/assets/
+official-plugins/ui.launcher/assets/
+official-plugins/plugins.manager/assets/
+
+# Local launcher and game data
+HydrogenTauriData/
+LauncherData/
+.minecraft/
+
+# Logs, temporary files and credentials
+*.log
+*.tmp
+*.temp
+*.part
+*.bak
+*.orig
+*.rej
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+
+# Editor and OS files
+.vs/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

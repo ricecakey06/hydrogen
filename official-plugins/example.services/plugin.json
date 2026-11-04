@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 1,
+  "id": "example.services",
+  "name": "Service consumer fixture",
+  "version": "1.0.0",
+  "runtime": "native",
+  "entry": "bin/plugin.dll",
+  "permissions": [
+    "native.code"
+  ],
+  "dependencies": [
+    {
+      "id": "account.offline",
+      "version": "^1"
+    }
+  ],
+  "provides": [
+    {
+      "id": "example.services",
+      "version": "1.0.0",
+      "methods": [
+        "forward"
+      ]
+    }
+  ]
+}

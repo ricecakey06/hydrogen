@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 1,
+  "id": "minecraft.install",
+  "name": "游戏安装",
+  "version": "1.0.0",
+  "runtime": "native",
+  "entry": "bin/plugin.dll",
+  "permissions": [
+    "native.code"
+  ],
+  "dependencies": [
+    {
+      "id": "minecraft.content",
+      "version": "^1",
+      "optional": false
+    },
+    {
+      "id": "minecraft.instances",
+      "version": "^1",
+      "optional": false
+    },
+    {
+      "id": "minecraft.preinstall",
+      "version": "^1",
+      "optional": false
+    },
+    {
+      "id": "minecraft.fabric",
+      "version": "^1",
+      "optional": true
+    },
+    {
+      "id": "storage",
+      "version": "^1",
+      "optional": false
+    }
+  ],
+  "provides": [
+    {
+      "id": "minecraft.install",
+      "version": "1.0.0",
+      "methods": [
+        "install",
+        "create",
+        "poll",
+        "cancel"
+      ]
+    }
+  ]
+}

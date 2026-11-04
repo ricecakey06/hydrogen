@@ -1,0 +1,14 @@
+[package]
+name = "hydrogen-example-counter"
+version = "1.0.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+step-two = []
+
+[dependencies]
+hydrogen-plugin-sdk = { path = "../../plugin-sdk/native" }

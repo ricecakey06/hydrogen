@@ -1,0 +1,9 @@
+[workspace]
+members = ["account.offline", "java.runtime", "example.counter", "example.counter.v2", "credentials", "platform.windows.environment", "diagnostics", "process", "minecraft.mods", "example.services", "network", "account.microsoft", "account.manager", "minecraft.download", "minecraft.files", "minecraft.content", "minecraft.fabric", "minecraft.preinstall", "minecraft.instances", "storage", "minecraft.install", "minecraft.launch", "minecraft.crash", "platform.windows.window", "ui.shell", "ui.launcher", "plugins.manager"]
+resolver = "3"
+
+[profile.release]
+opt-level = "s"
+lto = "thin"
+codegen-units = 1
+strip = true

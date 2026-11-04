@@ -1,0 +1,19 @@
+[package]
+name = "hydrogen-platform-windows-window"
+version = "1.0.0"
+edition = "2024"
+license = "MIT"
+[lib]
+crate-type = ["cdylib"]
+[dependencies]
+hydrogen-plugin-sdk = { path = "../../plugin-sdk/native" }
+hydrogen-plugin-services = { path = "../../plugin-sdk/services" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha1 = "0.10"
+reqwest = { version = "=0.13.5", default-features = false }
+uuid = { version = "1", features = ["v4"] }
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_UI_WindowsAndMessaging", "Win32_UI_Accessibility", "Win32_Graphics_Gdi", "Win32_System_Registry", "Win32_System_LibraryLoader"] }
+windows = { version = "0.62", features = ["System", "UI_Composition", "UI_Composition_Desktop", "Win32_System_WinRT_Composition", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging", "Win32_System_LibraryLoader", "Win32_UI_Shell", "Win32_System_Com", "Win32_System_Threading", "Win32_Security_Cryptography", "Win32_System_Memory", "Win32_Storage_FileSystem"] }
+windows-numerics = { version = "0.3" }

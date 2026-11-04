@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 1,
+  "id": "network",
+  "name": "网络服务",
+  "version": "1.0.0",
+  "runtime": "native",
+  "entry": "bin/plugin.dll",
+  "permissions": [
+    "native.code"
+  ],
+  "provides": [
+    {
+      "id": "network",
+      "version": "1.0.0",
+      "methods": [
+        "request",
+        "poll",
+        "chunk",
+        "close",
+        "stats"
+      ]
+    }
+  ]
+}

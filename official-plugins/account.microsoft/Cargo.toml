@@ -1,0 +1,17 @@
+[package]
+name = "hydrogen-account-microsoft"
+version = "1.0.0"
+edition = "2024"
+license = "MIT"
+[lib]
+crate-type = ["cdylib"]
+[dependencies]
+hydrogen-plugin-sdk = { path = "../../plugin-sdk/native" }
+hydrogen-plugin-services = { path = "../../plugin-sdk/services" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.23"
+sha2 = "0.10"
+uuid = { version = "1", features = ["v4"] }
+tokio = { version = "1", features = ["rt","time","net","sync","io-util","macros"] }
+reqwest = { version = "=0.13.5", default-features = false }

@@ -1,0 +1,13 @@
+[package]
+name = "hydrogen-process"
+version = "1.0.0"
+edition = "2024"
+license = "MIT"
+[lib]
+crate-type = ["cdylib"]
+[dependencies]
+hydrogen-plugin-sdk = { path = "../../plugin-sdk/native" }
+base64 = "0.23"
+uuid = { version = "1", features = ["v4"] }
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = ["Win32_System_Threading", "Win32_System_Pipes"] }

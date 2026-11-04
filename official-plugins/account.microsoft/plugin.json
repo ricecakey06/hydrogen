@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 1,
+  "id": "account.microsoft",
+  "name": "Microsoft 账号",
+  "version": "1.0.0",
+  "runtime": "native",
+  "entry": "bin/plugin.dll",
+  "permissions": [
+    "native.code"
+  ],
+  "dependencies": [
+    {
+      "id": "network",
+      "version": "^1"
+    },
+    {
+      "id": "credentials",
+      "version": "^1"
+    },
+    {
+      "id": "platform.windows.environment",
+      "version": "^1"
+    }
+  ],
+  "provides": [
+    {
+      "id": "account.microsoft",
+      "version": "1.0.0",
+      "methods": [
+        "view",
+        "reset",
+        "signOut",
+        "signIn",
+        "session",
+        "poll",
+        "cancel",
+        "failure",
+        "callback",
+        "forget"
+      ]
+    }
+  ]
+}

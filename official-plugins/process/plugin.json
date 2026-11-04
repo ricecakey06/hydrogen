@@ -1,0 +1,6 @@
+{
+  "schemaVersion":2, "apiVersion":1, "id":"process", "name":"进程服务",
+  "description":"独立参数数组启动、进程身份验证及有界输出轮询。", "version":"1.0.0",
+  "runtime":"native", "entry":"bin/plugin.dll", "permissions":["native.code"],
+  "provides":[{"id":"process","version":"1.0.0","methods":["stamp","spawn","poll","kill","detach"]}]
+}

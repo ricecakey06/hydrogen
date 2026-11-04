@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 1,
+  "id": "platform.windows.window",
+  "name": "Windows 窗口",
+  "version": "1.0.0",
+  "runtime": "native",
+  "entry": "bin/plugin.dll",
+  "permissions": [
+    "native.code"
+  ],
+  "dependencies": [],
+  "provides": [
+    {
+      "id": "platform.windows.window",
+      "version": "1.0.0",
+      "methods": [
+        "apply",
+        "geometry",
+        "event"
+      ]
+    }
+  ],
+  "executionThread": "main"
+}

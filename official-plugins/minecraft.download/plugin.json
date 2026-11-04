@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 1,
+  "id": "minecraft.download",
+  "name": "minecraft.download",
+  "version": "1.0.0",
+  "runtime": "native",
+  "entry": "bin/plugin.dll",
+  "permissions": [
+    "native.code"
+  ],
+  "dependencies": [
+    {
+      "id": "network",
+      "version": "^1"
+    }
+  ],
+  "provides": [
+    {
+      "id": "minecraft.download",
+      "version": "1.0.0",
+      "methods": [
+        "transfer",
+        "once",
+        "sourceUrl",
+        "trusted",
+        "poll",
+        "cancel"
+      ]
+    }
+  ]
+}
