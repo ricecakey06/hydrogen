@@ -342,7 +342,7 @@ pub fn install(
     let stage = candidate
         .plugin
         .root
-        .strip_prefix(root)
+        .strip_prefix(dunce::canonicalize(root)?)
         .map_err(|_| ApiError::new("INVALID_PATH", "暂存目录无效。"))?
         .to_string_lossy()
         .replace('\\', "/");

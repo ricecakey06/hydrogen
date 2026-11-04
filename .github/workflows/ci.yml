@@ -32,7 +32,10 @@ jobs:
       - uses: actions/checkout@v7
       - name: Select a temporary directory without linked ancestors
         # macOS's system temp path uses /var symlinks, which the filesystem guards reject.
-        run: echo "TMPDIR=$(cd "$RUNNER_TEMP" && pwd -P)" >> "$GITHUB_ENV"
+        run: |
+          temporary=$(cd "$RUNNER_TEMP" && pwd -P)
+          if [[ "$RUNNER_OS" == "Windows" ]]; then temporary=$(cygpath -m "$temporary"); fi
+          printf 'TMPDIR=%s\nTMP=%s\nTEMP=%s\n' "$temporary" "$temporary" "$temporary" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v7
         with:
           node-version: '24'

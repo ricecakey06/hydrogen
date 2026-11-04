@@ -28,6 +28,21 @@ fn fixture(source: &str, permissions: &[&str]) -> (tempfile::TempDir, Plugin) {
 }
 
 #[test]
+fn install_uses_canonical_data_root_for_staging_paths() {
+    let (source, _) = fixture("export function activate(ctx) {}", &[]);
+    let data = tempfile::tempdir().unwrap();
+    let root = data.path().join("data");
+    fs::create_dir(&root).unwrap();
+    let alias = root.join("..").join("data");
+    let archive = data.path().join("example.hplugin");
+    package::pack(source.path(), &archive).unwrap();
+    let candidate = manager::prepare(&alias, &archive).unwrap();
+    let installed = manager::install(&alias, &candidate, None).unwrap();
+    assert_eq!(installed.manifest.id, "example.test");
+    assert!(root.join("plugins/example.test/main.js").is_file());
+}
+
+#[test]
 fn builtin_manifests_are_extracted_once_loaded_and_protected() {
     let dir = tempfile::tempdir().unwrap();
     manager::initialize(dir.path()).unwrap();
