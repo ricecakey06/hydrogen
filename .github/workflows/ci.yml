@@ -61,10 +61,10 @@ jobs:
       - name: Test plugin SDKs
         run: cargo test --manifest-path official-plugins/Cargo.toml --locked -p hydrogen-plugin-sdk -p hydrogen-plugin-services
       - name: Test host without desktop dependencies
-        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --no-default-features
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --no-default-features --no-fail-fast
       - name: Test desktop integration
         if: runner.os == 'Windows'
-        run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --no-fail-fast
 
   windows-package:
     name: Package Windows x64

@@ -2,11 +2,7 @@ mod common;
 
 use hydrogen::{launcher::storage::Settings, plugins::manager};
 use serde_json::json;
-use std::{
-    fs,
-    io::Read,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::{fs, io::Read, time::UNIX_EPOCH};
 
 const TASK: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
@@ -27,10 +23,8 @@ async fn crash_plugin_uses_current_logs_and_exports_an_immutable_redacted_snapsh
             fs::FileTimes::new().set_modified(UNIX_EPOCH + std::time::Duration::from_secs(10)),
         )
         .unwrap();
-    let started = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64;
+    // The old log is dated at 10 seconds; avoid filesystem/wall-clock precision races.
+    let started = 20_000_u64;
     fs::write(
         root.join(format!("logs/game-{TASK}.log")),
         "OutOfMemoryError: Java heap space\n--accessToken console-secret-value",
