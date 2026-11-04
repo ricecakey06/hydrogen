@@ -92,7 +92,7 @@ pub fn apply(window: &WebviewWindow, glass: &mut super::glass::State) -> Appeara
     }
     #[cfg(not(windows))]
     {
-        let _ = window;
+        let _ = (window, glass);
         Appearance {
             material: "solid",
             reason: "当前环境不支持系统背景模糊",

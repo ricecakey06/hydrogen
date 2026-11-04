@@ -1,4 +1,14 @@
+#[cfg(windows)]
 mod glass;
+#[cfg(not(windows))]
+mod glass {
+    #[derive(Default)]
+    pub struct State;
+    impl State {
+        pub fn disable(&mut self) {}
+        pub fn sync(&self) {}
+    }
+}
 mod window;
 use hydrogen_plugin_sdk::contracts::{ApiError, Result};
 use serde_json::{Value, json};
