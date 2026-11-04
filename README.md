@@ -12,13 +12,15 @@
 
 [![madewithlove](https://img.shields.io/badge/made_with-%E2%9D%A4-red?style=for-the-badge&labelColor=orange)](https://github.com/ricecakey06/hydrogen)
 [![Licence](https://img.shields.io/badge/LICENSE-MIT-green.svg?style=for-the-badge)](LICENSE)
-[![Build and test](https://github.com/ricecakey06/hydrogen/actions/workflows/ci.yml/badge.svg)](https://github.com/ricecakey06/hydrogen/actions/workflows/ci.yml)
+[![Build and test](https://github.com/ricecakey06/hydrogen/actions/workflows/ci.yml/badge.svg?branch=tauri)](https://github.com/ricecakey06/hydrogen/actions/workflows/ci.yml?query=branch%3Atauri)
 
 [下载与使用](#下载与使用) · [从源码构建](#从源码构建) · [插件开发](#项目结构与插件开发)
 
 </div>
 
 Hydrogen 将界面、账号、游戏实例和平台功能组织为独立插件，由宿主管理依赖、权限及生命周期。当前版本为 **0.2.7**，桌面发行目标为 Windows x64。
+
+Tauri 版位于默认分支 [`tauri`](https://github.com/ricecakey06/hydrogen/tree/tauri)，原 .NET/Avalonia 版保留在 [`legacy`](https://github.com/ricecakey06/hydrogen/tree/legacy) 分支。
 
 项目仍在开发中，主要由 AI 辅助编写，长期可用性和稳定性仍需持续验证。
 
@@ -136,13 +138,7 @@ $check.ExitCode
 .\src-tauri\target\release\Launcher.exe --dev-plugin D:\MyPlugin
 ```
 
-界面可安装、升级、启停、卸载及校验重载插件；相同发行包不会在重启时补回用户已卸载的插件。JavaScript 插件运行于受限 QuickJS 环境，不提供 Node.js、DOM、任意文件或进程接口。原生插件具有进程级权限，仅安装可信来源的插件；旧版 .NET 插件不兼容。
-
-## GitHub Actions
-
-[CI 工作流](.github/workflows/ci.yml) 在 push、Pull Request 和手动触发时执行三平台 Rust 测试、前端构建与测试，Windows 额外运行桌面集成测试。全部通过后构建 Windows x64 EXE，执行原生与界面启动检查，并上传保留 14 天的 `Hydrogen-win-x64` 产物。
-
-`main` 分支的 push 或手动运行还会使用 [Release Drafter 配置](.github/release-drafter.yml) 生成发布说明，发布经过检查的 `Launcher.exe` 和 `SHA256SUMS.txt`。首个 Release 使用 `package.json` 中的版本，之后由 Release Drafter 解析下一版本；发布作业使用仓库的 `GITHUB_TOKEN`。
+界面可安装、升级、启停、卸载及校验重载插件；相同发行包不会在重启时补回用户已卸载的插件。JavaScript 插件运行于受限 QuickJS 环境，不提供 Node.js、DOM、任意文件或进程接口。原生插件具有进程级权限，应仅安装可信来源的插件。
 
 ## 反馈与贡献
 

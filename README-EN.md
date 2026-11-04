@@ -12,13 +12,15 @@ A simple interface · Everything is a plugin
 
 [![madewithlove](https://img.shields.io/badge/made_with-%E2%9D%A4-red?style=for-the-badge&labelColor=orange)](https://github.com/ricecakey06/hydrogen)
 [![Licence](https://img.shields.io/badge/LICENSE-MIT-green.svg?style=for-the-badge)](LICENSE)
-[![Build and test](https://github.com/ricecakey06/hydrogen/actions/workflows/ci.yml/badge.svg)](https://github.com/ricecakey06/hydrogen/actions/workflows/ci.yml)
+[![Build and test](https://github.com/ricecakey06/hydrogen/actions/workflows/ci.yml/badge.svg?branch=tauri)](https://github.com/ricecakey06/hydrogen/actions/workflows/ci.yml?query=branch%3Atauri)
 
 [Download and usage](#download-and-usage) · [Build from source](#build-from-source) · [Plugin development](#project-layout-and-plugin-development)
 
 </div>
 
 Hydrogen organizes its interface, accounts, game instances and platform features into independent plugins. The host manages dependencies, permissions and lifetimes. The current version is **0.2.7**, targeting Windows x64 desktop distribution.
+
+The Tauri version lives on the default [`tauri`](https://github.com/ricecakey06/hydrogen/tree/tauri) branch. The original .NET/Avalonia version is preserved on [`legacy`](https://github.com/ricecakey06/hydrogen/tree/legacy).
 
 The project is under development and primarily written with AI assistance. Long-term usability and stability still require ongoing validation.
 
@@ -136,13 +138,7 @@ A `.hplugin` package is a ZIP containing `plugin.json`, an entry point and asset
 .\src-tauri\target\release\Launcher.exe --dev-plugin D:\MyPlugin
 ```
 
-The UI supports installation, upgrades, enable/disable, uninstall and validated reload. Restarting the same distribution does not restore plugins the user uninstalled. JavaScript runs in restricted QuickJS without Node.js, DOM or arbitrary filesystem/process access. Native plugins have process-level privileges; install only trusted plugins. Legacy .NET plugins are incompatible.
-
-## GitHub Actions
-
-The [CI workflow](.github/workflows/ci.yml) runs on pushes, pull requests and manual dispatch. It builds and tests the frontend and Rust code across three platforms, with additional desktop integration tests on Windows. Once all tests pass, it builds the Windows x64 EXE, checks native and UI startup, and uploads a `Hydrogen-win-x64` artifact retained for 14 days.
-
-Pushes and manual runs on `main` also use the [Release Drafter configuration](.github/release-drafter.yml) to generate release notes and publish the tested `Launcher.exe` and `SHA256SUMS.txt`. The first release uses the version in `package.json`; Release Drafter resolves subsequent versions. The release job uses the repository's `GITHUB_TOKEN`.
+The UI supports installation, upgrades, enable/disable, uninstall and validated reload. Restarting the same distribution does not restore plugins the user uninstalled. JavaScript runs in restricted QuickJS without Node.js, DOM or arbitrary filesystem/process access. Native plugins have process-level privileges; install only trusted plugins.
 
 ## Feedback and contributions
 

@@ -127,7 +127,7 @@ jobs:
   release:
     name: Publish release
     needs: windows-package
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/tauri' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
