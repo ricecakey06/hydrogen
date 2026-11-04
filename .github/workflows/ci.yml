@@ -85,28 +85,38 @@ jobs:
       - name: Build Release plugins
         run: cargo build --manifest-path official-plugins/Cargo.toml --release --locked
       - name: Build standalone executable
+        id: executable
         run: cargo build --manifest-path src-tauri/Cargo.toml --release --locked --features custom-protocol --bin Launcher
       - name: Check packaged startup and bundled plugins
         shell: pwsh
         run: |
           $exe = (Resolve-Path -LiteralPath src-tauri/target/release/Launcher.exe).Path
-          $check = Start-Process -FilePath $exe -ArgumentList '--check' -WindowStyle Hidden -PassThru
+          $probe = Join-Path $env:RUNNER_TEMP 'hydrogen-startup'
+          New-Item -ItemType Directory -Path $probe | Out-Null
+          Copy-Item -LiteralPath $exe -Destination (Join-Path $probe 'Launcher.exe')
+          $env:RUST_BACKTRACE = '1'
+          $startedAt = Get-Date
+          $check = Start-Process -FilePath $exe -ArgumentList '--check' -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $probe 'check-stdout.log') -RedirectStandardError (Join-Path $probe 'check-stderr.log')
           if (-not $check.WaitForExit(30000)) {
             Stop-Process -Id $check.Id -ErrorAction SilentlyContinue
             throw 'Packaged startup check timed out.'
           }
-          if ($check.ExitCode -ne 0) { throw 'Packaged startup check failed.' }
+          if ($check.ExitCode -ne 0) {
+            Get-Content -LiteralPath (Join-Path $probe 'check-stderr.log') -ErrorAction SilentlyContinue
+            throw "Packaged startup check failed with exit code $($check.ExitCode)."
+          }
 
           # --check only checks WebView2; start the packaged UI to verify plugin deployment.
-          $probe = Join-Path $env:RUNNER_TEMP 'hydrogen-startup'
-          New-Item -ItemType Directory -Path $probe | Out-Null
           $ready = Join-Path $probe 'ready.json'
           $arguments = @('--data-dir', "`"$probe/data`"", '--benchmark-ready-file', "`"$ready`"", '--benchmark-webview-data', "`"$probe/webview`"")
-          $process = Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
+          $process = Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $probe 'stdout.log') -RedirectStandardError (Join-Path $probe 'stderr.log')
           try {
             $deadline = [DateTime]::UtcNow.AddSeconds(60)
             while (-not (Test-Path -LiteralPath $ready)) {
-              if ($process.HasExited) { throw 'Packaged UI exited before becoming ready.' }
+              if ($process.HasExited) {
+                $process.WaitForExit()
+                throw "Packaged UI exited before becoming ready with exit code $($process.ExitCode)."
+              }
               if ([DateTime]::UtcNow -ge $deadline) { throw 'Packaged UI startup timed out.' }
               Start-Sleep -Milliseconds 250
             }
@@ -119,9 +129,31 @@ jobs:
                 throw "Bundled plugin entry is missing: $id"
               }
             }
+          } catch {
+            $failure = $_
+            Get-Content -LiteralPath (Join-Path $probe 'stdout.log'),(Join-Path $probe 'stderr.log') -Tail 80 -ErrorAction SilentlyContinue
+            try {
+              Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=$startedAt; Id=1000,1001} -MaxEvents 20 -ErrorAction Stop |
+                Where-Object { $_.Message -match 'Launcher\.exe|msedgewebview2\.exe' } |
+                Select-Object TimeCreated,Id,ProviderName,Message |
+                ConvertTo-Json -Depth 3 |
+                Tee-Object -FilePath (Join-Path $probe 'events.json')
+            } catch { Write-Warning "Application event diagnostics unavailable: $($_.Exception.Message)" }
+            throw $failure
           } finally {
             if (-not $process.HasExited) { Stop-Process -Id $process.Id -ErrorAction SilentlyContinue }
           }
+      - name: Upload startup failure diagnostics
+        if: failure() && steps.executable.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: Hydrogen-startup-diagnostics
+          path: |
+            ${{ runner.temp }}/hydrogen-startup/*.log
+            ${{ runner.temp }}/hydrogen-startup/*.json
+            ${{ runner.temp }}/hydrogen-startup/Launcher.exe
+          if-no-files-found: warn
+          retention-days: 7
       - name: Upload Windows executable
         uses: actions/upload-artifact@v7
         with:
