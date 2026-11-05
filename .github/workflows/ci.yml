@@ -176,6 +176,8 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - name: Download the tested Windows executable
         uses: actions/download-artifact@v8
         with:
@@ -186,16 +188,24 @@ jobs:
           test -s release/Launcher.exe
           cd release
           sha256sum Launcher.exe > SHA256SUMS.txt
-      - name: Set initial release version
+      - name: Select release comparison base
         id: version
         run: |
-          initial=$(jq -r .version package.json)
-          version=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --exclude-pre-releases --limit 100 --json tagName --jq "if length == 0 then \"$initial\" else \"\" end")
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          tags=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --exclude-pre-releases --limit 100 --json tagName --jq '.[].tagName')
+          while IFS= read -r tag; do
+            if [[ -n "$tag" ]] && git merge-base --is-ancestor "refs/tags/$tag" HEAD 2>/dev/null; then
+              printf 'from=refs/tags/%s\n' "$tag" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done <<< "$tags"
+          # The first Tauri release has no published tag in its own history.
+          printf 'from=%s\n' "$(git rev-list --first-parent --max-parents=0 HEAD)" >> "$GITHUB_OUTPUT"
+          printf 'version=%s\n' "$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
       - name: Draft release notes
         id: draft
-        uses: release-drafter/release-drafter@v7
+        uses: release-drafter/release-drafter@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7 with `from` support
         with:
+          from: ${{ steps.version.outputs.from }}
           version: ${{ steps.version.outputs.version }}
           commitish: ${{ github.sha }}
           publish: false
