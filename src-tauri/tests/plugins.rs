@@ -474,6 +474,18 @@ async fn ten_plugins_really_activate_with_independent_runtimes() {
 }
 
 #[test]
+fn package_walk_accepts_an_aliased_root_with_nested_files() {
+    let (dir, _) = fixture("export function activate() {}", &[]);
+    let nested = dir.path().join("bin");
+    fs::create_dir(&nested).unwrap();
+    fs::write(nested.join("plugin.dll"), b"test payload").unwrap();
+
+    let (entries, digest) = package::files(&nested.join("..")).unwrap();
+    assert!(entries.iter().any(|(name, _)| name == "bin/plugin.dll"));
+    assert_eq!((entries, digest), package::files(dir.path()).unwrap());
+}
+
+#[test]
 fn packaging_keeps_only_safe_relative_entries_and_refuses_overwrite() {
     let (dir, _) = fixture("export function activate() {}", &[]);
     let output_dir = tempfile::tempdir().unwrap();

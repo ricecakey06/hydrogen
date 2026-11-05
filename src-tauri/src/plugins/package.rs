@@ -25,7 +25,7 @@ pub fn files(root: &Path) -> Result<(Vec<(String, PathBuf)>, String)> {
             let path = entry.path();
             let name = path
                 .strip_prefix(root)
-                .unwrap()
+                .map_err(|_| ApiError::new("INVALID_PATH", "包文件路径越过插件目录。"))?
                 .to_string_lossy()
                 .replace('\\', "/");
             let checked = super::manifest::within(root, &name)?;
@@ -48,8 +48,9 @@ pub fn files(root: &Path) -> Result<(Vec<(String, PathBuf)>, String)> {
         }
         Ok(())
     }
+    let root = dunce::canonicalize(root)?;
     let mut entries = Vec::new();
-    walk(root, root, &mut entries, &mut 0, &mut 0, 0)?;
+    walk(&root, &root, &mut entries, &mut 0, &mut 0, 0)?;
     entries.sort_by(|a, b| a.0.cmp(&b.0));
     let mut names = HashSet::new();
     let mut hash = Sha256::new();
