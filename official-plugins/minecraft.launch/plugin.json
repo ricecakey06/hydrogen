@@ -3,6 +3,7 @@
   "apiVersion": 1,
   "id": "minecraft.launch",
   "name": "游戏启动",
+  "description": "根据实例配置选择 Java、组装启动参数并启动 Minecraft。",
   "version": "1.0.0",
   "runtime": "native",
   "entry": "bin/plugin.dll",

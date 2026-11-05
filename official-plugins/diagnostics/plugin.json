@@ -3,7 +3,7 @@
   "apiVersion": 1,
   "id": "diagnostics",
   "name": "诊断日志",
-  "description": "独立有界日志写入与敏感值脱敏服务。",
+  "description": "记录游戏运行日志，限制日志大小并隐藏已知的敏感信息。",
   "version": "1.0.0",
   "runtime": "native",
   "entry": "bin/plugin.dll",

@@ -315,6 +315,7 @@ pub fn preview(
                 directory_name: None,
                 repository_root: None,
                 loader_name: String::new(),
+                isolated: false,
             },
             files,
             record: fingerprint(&record, String::new())?,

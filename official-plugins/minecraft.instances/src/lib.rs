@@ -68,6 +68,7 @@ impl State {
                     text(p, "version")?,
                     text(p, "name")?,
                     serde_json::from_value(p["components"].clone())?,
+                    p["packStage"].as_str(),
                 )?)?),
                 "records.gameDir" => Ok(serde_json::to_value(store.game_dir(text(p, "id")?)?)?),
                 "records.versionDir" => {

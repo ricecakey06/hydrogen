@@ -55,7 +55,7 @@ $settings = [ordered]@{
         gameDirectory=$null;isolateGameDirectory=$true;java=$java;maxMemoryMib=512;
         windowMode='default';windowWidth=854;windowHeight=480;afterLaunch='keep';jvmArguments='';
         downloadSource='official';offlineEnabled=$true;offlinePlayerName='CrashTester';accountMode='offline';
-        microsoftClientId='9a5a637c-bca3-44d2-984c-cb49aac9f5b7';modules=@{}
+        microsoftClientId='';modules=@{}
     }
 }
 [System.IO.File]::WriteAllText((Join-Path $data 'settings.json'), ($settings | ConvertTo-Json -Depth 12), [System.Text.UTF8Encoding]::new($false))

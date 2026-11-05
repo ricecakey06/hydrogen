@@ -6,22 +6,10 @@ fn microsoft_client_id_upgrades_previous_defaults_and_preserves_custom_clients()
     let dir = tempfile::tempdir().unwrap();
     let mut store = Store::open(dir.path().to_path_buf()).unwrap();
     let configured_client = store.settings.microsoft_client_id.clone();
-    assert!(!configured_client.is_empty());
-    if std::env::var_os("HYDROGEN_MICROSOFT_CLIENT_ID").is_none() {
-        assert_eq!(configured_client, "9a5a637c-bca3-44d2-984c-cb49aac9f5b7");
-    }
+    assert_eq!(configured_client, Settings::default().microsoft_client_id);
     let mut settings = store.settings.clone();
     settings.microsoft_client_id.clear();
     settings.offline_player_name = "ExistingPlayer".into();
-    store.save(settings).unwrap();
-    drop(store);
-
-    let mut store = Store::open(dir.path().to_path_buf()).unwrap();
-    assert!(!store.read_only);
-    assert_eq!(store.settings.microsoft_client_id, configured_client);
-    assert_eq!(store.settings.offline_player_name, "ExistingPlayer");
-    let mut settings = store.settings.clone();
-    settings.microsoft_client_id = "c0643bbe-d204-4e4d-a8a2-e57c2497589f".into();
     store.save(settings).unwrap();
     drop(store);
 

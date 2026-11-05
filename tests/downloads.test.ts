@@ -7,11 +7,18 @@ function task(fields: Partial<Task> = {}): Task {
   return { id: 'job', instanceId: 'instance', instanceName: '测试实例', gameVersion: '1.20.1', kind: 'install', phase: 'downloading', message: '', completed: 1, total: 2,
     download: { completed: 512 * 1024, total: 1024 * 1024, completedFiles: 1, totalFiles: 2, activeFiles: ['libraries\\large.jar'] }, sequence: 1, startedAt: 1, logPath: null, exitCode: null, ...fields };
 }
-test('download queue matches the original active/failed install queue', () => {
+test('download queue includes active and failed game and resource downloads', () => {
   const active = task(), failed = task({ phase: 'failed' });
-  assert.deepEqual(downloadJobs([active, task({ phase: 'completed' }), task({ phase: 'cancelled' }), failed, task({ kind: 'launch' }), task({ kind: 'login' }), task({ kind: 'legacyImport' })]), [active, failed]);
+  const mod = task({ kind: 'modDownload' });
+  assert.deepEqual(downloadJobs([active, task({ phase: 'completed' }), task({ phase: 'cancelled' }), failed, mod, task({ kind: 'modInstall' }), task({ kind: 'launch' }), task({ kind: 'login' }), task({ kind: 'legacyImport' })]), [active, failed, mod]);
   assert.equal(downloadSummary([]).text, '没有进行中的下载');
   assert.equal(downloadSummary([failed]).text, '下载已停止，可重试未完成的任务');
+});
+test('a modpack import leaves Downloads when installed and keeps retryable attempts', () => {
+  const active = task({ kind: 'modpackImport', phase: 'extracting', instanceId: null });
+  const failed = task({ kind: 'modpackImport', phase: 'failed' });
+  const retryable = task({ kind: 'modpackImport', phase: 'cancelled' });
+  assert.deepEqual(downloadJobs([active, { ...active, phase: 'completed' }, failed, retryable, { ...retryable, instanceId: null }]), [active, failed, retryable]);
 });
 test('overall progress is weighted by bytes and becomes indeterminate while resolving', () => {
   const small = task({ download: { completed: 1, total: 10, completedFiles: 1, totalFiles: 1, activeFiles: [] } });

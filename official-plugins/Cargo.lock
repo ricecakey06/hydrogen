@@ -584,6 +584,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "hydrogen-minecraft-modpacks"
+version = "1.0.0"
+dependencies = [
+ "hydrogen-plugin-sdk",
+ "hydrogen-plugin-services",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha1",
+ "sha2",
+ "tempfile",
+ "tokio",
+ "uuid",
+ "zip",
+]
+
+[[package]]
 name = "hydrogen-minecraft-mods"
 version = "1.0.0"
 dependencies = [
@@ -611,6 +628,17 @@ dependencies = [
  "sha1",
  "tokio",
  "uuid",
+]
+
+[[package]]
+name = "hydrogen-minecraft-resources"
+version = "1.0.0"
+dependencies = [
+ "hydrogen-plugin-sdk",
+ "hydrogen-plugin-services",
+ "reqwest",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

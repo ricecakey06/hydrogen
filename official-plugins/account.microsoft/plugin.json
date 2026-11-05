@@ -3,6 +3,7 @@
   "apiVersion": 1,
   "id": "account.microsoft",
   "name": "Microsoft 账号",
+  "description": "通过 Microsoft 账号登录 Minecraft，验证游戏资格并恢复已保存的登录会话。",
   "version": "1.0.0",
   "runtime": "native",
   "entry": "bin/plugin.dll",

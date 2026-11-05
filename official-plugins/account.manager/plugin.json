@@ -3,6 +3,7 @@
   "apiVersion": 1,
   "id": "account.manager",
   "name": "账号管理",
+  "description": "管理 Microsoft 和离线玩家档案，选择启动游戏时使用的玩家身份。",
   "version": "1.0.0",
   "runtime": "native",
   "entry": "bin/plugin.dll",

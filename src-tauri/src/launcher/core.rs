@@ -474,21 +474,7 @@ impl Launcher {
         let task_id = job.state.lock().unwrap().id.clone();
         let this = self.clone();
         tauri::async_runtime::spawn(async move {
-            let work = async {
-                let state = this.store.lock().unwrap().state();
-                let result = net::task(
-                    &this.client,
-                    "minecraft.install",
-                    "install",
-                    serde_json::json!({"state":state,"instance":instance}),
-                    Some(&job),
-                )
-                .await?;
-                let mut store = this.store.lock().unwrap();
-                store.selected = serde_json::from_value(result["selected"].clone())?;
-                store.invalidate_repository();
-                Ok(())
-            };
+            let work = this.install_instance(&instance, &job);
             let result = tokio::select! {_=job.cancel.cancelled()=>Err(ApiError::new("CANCELLED","安装已取消，可重试以复用缓存。")),result=work=>result};
             drop(lease);
             drop(root);
@@ -507,6 +493,25 @@ impl Launcher {
             }));
         });
         Ok(task_id)
+    }
+    pub(super) async fn install_instance(
+        &self,
+        instance: &Instance,
+        job: &super::tasks::Job,
+    ) -> Result<()> {
+        let state = self.store.lock().unwrap().state();
+        let result = net::task(
+            &self.client,
+            "minecraft.install",
+            "install",
+            serde_json::json!({"state":state,"instance":instance}),
+            Some(job),
+        )
+        .await?;
+        let mut store = self.store.lock().unwrap();
+        store.selected = serde_json::from_value(result["selected"].clone())?;
+        store.invalidate_repository();
+        Ok(())
     }
     pub fn login(self: &Arc<Self>, restore: bool) -> Result<String> {
         self.login_inner(restore, false)

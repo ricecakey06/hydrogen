@@ -2,8 +2,14 @@ import { t } from './i18n.ts';
 import { invoke } from '@tauri-apps/api/core';
 
 export interface Overrides { java: string | null; maxMemoryMib: number | null; jvmArguments: string | null }
-export interface Components { kind?: 'fabric' | 'forge' | 'neoforge'; loader: string; fabricApi: string | null }
+export interface Components { kind?: 'fabric' | 'forge' | 'neoforge' | 'quilt'; loader: string; fabricApi: string | null }
 export interface InstanceInfo { id: string; name: string; gameVersion: string; isInstalled: boolean; overrides: Overrides; components: Components | null; directoryName: string | null; loaderName: string }
+export function instanceLoaderLabel(instance: InstanceInfo) {
+  const components = instance.components;
+  if (!components) return instance.loaderName || t("原版");
+  const name = instance.loaderName || ({ fabric: 'Fabric', forge: 'Forge', neoforge: 'NeoForge', quilt: 'Quilt' })[components.kind ?? 'fabric'];
+  return [name, components.loader].filter(Boolean).join(' ');
+}
 export interface Settings { locale: string; gameDirectory: string | null; isolateGameDirectory: boolean | null; java: string | null; maxMemoryMib: number; windowMode: string; windowWidth: number; windowHeight: number; afterLaunch: string; jvmArguments: string; downloadSource: string; offlineEnabled: boolean; offlinePlayerName: string; accountMode: string; microsoftClientId: string; modules: Record<string, boolean> }
 export interface JavaRuntime { path: string; version: string; major: number; architecture: string }
 export interface DownloadProgress { completed: number; total: number | null; completedFiles: number; totalFiles: number; activeFiles: string[] }
@@ -13,7 +19,7 @@ export interface Task { id: string; instanceId: string | null; instanceName: str
 export interface Profile { id: string; kind: 'microsoft' | 'offline'; name: string; uuid: string | null; skin?: string | null }
 export interface Account { profiles: Profile[]; selectedProfileId: string | null; status: string; playerName: string | null; mode: string; offlineAvailable: boolean; detail: string | null; skin: string | null }
 export interface GameVersion { id: string; releaseTime: string; versionType: 'release' | 'snapshot' }
-export interface ModInfo { id: string; englishName: string; chineseName: string | null; version: string; summary: string; kind: string; fileName: string | null; sha1: string | null; enabled: boolean; icon: string | null; problem: string | null }
+export interface ModInfo { id: string; englishName: string; chineseName: string | null; version: string; summary: string; kind: string; fileName: string | null; sha1: string | null; enabled: boolean; duplicate: boolean; icon: string | null; problem: string | null }
 export interface ModRef { fileName: string; sha1: string }
 export interface PluginInfo {
   id: string; name: string; version: string; digest: string; permissions: string[];

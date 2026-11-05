@@ -1,8 +1,27 @@
+<script module lang="ts">
+  export type InstanceSettingsTab = 'general' | 'mods' | 'packExport';
+</script>
+
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import { t, i18n } from '../../../ui.shell/frontend/lib/i18n';
-  import { action, errorMessage, taskActive, type InstanceInfo, type Snapshot, type Settings, type JavaRuntime } from '../../../ui.shell/frontend/lib/api';
+  import { action, errorMessage, instanceLoaderLabel, taskActive, type InstanceInfo, type Snapshot, type Settings, type JavaRuntime } from '../../../ui.shell/frontend/lib/api';
+  import Icon from '../../../ui.shell/frontend/components/Icon.svelte';
   import { entrance, animateText } from '../../../ui.shell/frontend/lib/motion';
-  let { instance, snapshot, onmods, onlogin, onprofiles, onchange, ondelete, onimport, onrepair }: { instance?: InstanceInfo; snapshot: Snapshot | null; onmods: () => void; onlogin: () => void; onprofiles: () => void; onchange: () => Promise<void>; ondelete: () => void; onimport: () => void; onrepair: (id: string) => void } = $props();
+  let { instance, snapshot, instanceTab = $bindable('general'), mods, exportPack, onlogin, onprofiles, onchange, ondelete, onimport, onrepair }: {
+    instance?: InstanceInfo; snapshot: Snapshot | null; instanceTab?: InstanceSettingsTab;
+    mods?: Snippet<[InstanceInfo]>; exportPack?: Snippet<[InstanceInfo]>;
+    onlogin: () => void; onprofiles: () => void; onchange: () => Promise<void>; ondelete: () => void;
+    onimport: () => void; onrepair: (id: string) => void;
+  } = $props();
+  const formId = $props.id();
+  const canExport = $derived(!!exportPack && !!instance?.isInstalled && !snapshot?.readOnly);
+  const instanceTabs = $derived(([
+    { id: 'general', label: t("常规"), icon: 'settings' },
+    { id: 'mods', label: t("模组管理"), icon: 'puzzle' },
+    { id: 'packExport', label: t("导出整合包"), icon: 'cube' },
+  ] as const).filter(tab => tab.id !== 'packExport' || canExport));
+  let openedTools = $state({ mods: false, packExport: false });
   let locale = $state('zh-CN');
   const legacyImport = $derived(snapshot?.tasks.find(task => task.kind === 'legacyImport'));
   let instanceName = $state('');
@@ -23,6 +42,8 @@
     const key = `${snapshot?.dataDirectory}/${instance?.id ?? 'global'}`;
     if (!snapshot || loaded === key) return;
     loaded = key;
+    instanceTab = 'general';
+    openedTools = { mods: false, packExport: false };
     const settings = snapshot.settings;
     locale = $i18n.languages.some(language => language.locale === settings.locale) ? settings.locale : $i18n.locale;
     instanceName = instance?.name ?? '';
@@ -33,6 +54,27 @@
     source = settings.downloadSource; windowMode = settings.windowMode; windowWidth = settings.windowWidth; windowHeight = settings.windowHeight; afterLaunch = settings.afterLaunch;
     error = ''; message = '';
   });
+  $effect(() => {
+    if (!canExport && instanceTab === 'packExport') instanceTab = 'general';
+  });
+  function selectInstanceTab(tab: InstanceSettingsTab) {
+    instanceTab = tab;
+    if (tab === 'mods' || tab === 'packExport') openedTools[tab] = true;
+  }
+  function onTabKeydown(event: KeyboardEvent, index: number) {
+    const last = instanceTabs.length - 1;
+    let next: number;
+    switch (event.key) {
+      case 'ArrowLeft': next = index === 0 ? last : index - 1; break;
+      case 'ArrowRight': next = index === last ? 0 : index + 1; break;
+      case 'Home': next = 0; break;
+      case 'End': next = last; break;
+      default: return;
+    }
+    event.preventDefault();
+    selectInstanceTab(instanceTabs[next].id);
+    document.getElementById(`${formId}-tab-${instanceTab}`)?.focus();
+  }
   async function operate(type: string, fields: Record<string,unknown> = {}) { busy = true; error = ''; message = ''; try { const result = await action<unknown>(type, fields); await onchange(); return result; } catch (e) { error = errorMessage(e); } finally { busy = false; } }
   async function chooseJava() { const runtime = await operate('javaChoose') as JavaRuntime | null | undefined; if (runtime) java = runtime.path; }
   function repair() { if (instance && !busy) onrepair(instance.id); }
@@ -47,18 +89,73 @@
   const languageAvailable = $derived(snapshot?.plugins.some(p => p.id === 'i18n' && p.enabled && !p.problem) ?? false);
 </script>
 
-<div class="form-page">
-  <div class="scroll-pane form-scroll">
-    {#if instance}
-      <label class="section-label" for="instance-name">{t("实例名称")}</label>
-      <div class="input-action"><input id="instance-name" maxlength="64" bind:value={instanceName} /><button disabled={busy} onclick={() => operate('renameInstance', { id: instance.id, name: instanceName })}>{t("重命名")}</button></div>
-      <p class="caption">Minecraft {instance.gameVersion} · {instance.components ? `Fabric ${instance.components.loader}` : instance.loaderName || t("原版")} · {instance.isInstalled ? t("已安装") : t("尚未安装完成")}</p>
-      <h2 class="section-label">{t("模组")}</h2>
-      <button class="full-width tall" onclick={onmods}>{t("管理此实例的模组")}</button>
-      <h2 class="section-label">{t("游戏文件")}</h2>
-      <button class="full-width tall" disabled={busy} onclick={repair}>{t("下载或修复游戏文件")}</button>
-      <p class="caption">{t("复用已校验的文件，只下载缺失或损坏的内容。")}</p><button class="text-button" onclick={() => operate('openDirectory', { id: instance.id })}>{t("打开实例目录")}</button>
-    {:else}
+<!-- §2.1, §3.6: keep the instance overview and tabs above the scrolling panel, with save in the footer. -->
+<div class="form-page" class:instance-form={!!instance}>
+  {#if instance}
+    <div class="instance-header">
+      <section class="instance-overview" aria-labelledby="instance-overview-title">
+        <span class="instance-emblem"><Icon name="cube" size={29} width={1.6} /></span>
+        <div class="instance-identity">
+          <h2 id="instance-overview-title" title={instance.name}>{instance.name}</h2>
+          <p>Minecraft {instance.gameVersion} <span aria-hidden="true">·</span> {instanceLoaderLabel(instance)}</p>
+        </div>
+        <span class="instance-status" class:installed={instance.isInstalled}>
+          <Icon name={instance.isInstalled ? 'circle-check' : 'clock'} size={15} />
+          {instance.isInstalled ? t("已安装") : t("尚未安装完成")}
+        </span>
+      </section>
+      <div class="segmented instance-tabs" role="tablist" aria-label={t("版本设置")}>
+        {#each instanceTabs as tab, index (tab.id)}
+          <button type="button" role="tab" id={`${formId}-tab-${tab.id}`} aria-controls={`${formId}-panel-${tab.id}`}
+                  class:selected={instanceTab === tab.id} aria-selected={instanceTab === tab.id} tabindex={instanceTab === tab.id ? 0 : -1}
+                  onclick={() => selectInstanceTab(tab.id)} onkeydown={event => onTabKeydown(event, index)}>
+            <Icon name={tab.icon} size={17} />{tab.label}
+          </button>
+        {/each}
+      </div>
+    </div>
+    <div class="scroll-pane form-scroll" role="tabpanel" id={`${formId}-panel-general`}
+         aria-labelledby={`${formId}-tab-general`} hidden={instanceTab !== 'general'}>
+      <section class="instance-panel" aria-labelledby={`${formId}-runtime-heading`}>
+        <h2 id={`${formId}-runtime-heading`}>{t("启动配置")}</h2>
+        <p class="caption">{t("这些设置只应用于当前实例。")}</p>
+        <div class="instance-field">{@render javaEditor()}</div>
+        <div class="instance-field">{@render memoryEditor()}</div>
+        {@render jvmEditor()}
+      </section>
+      <section class="instance-panel" aria-labelledby={`${formId}-management-heading`}>
+        <h2 id={`${formId}-management-heading`}>{t("实例管理")}</h2>
+        <div class="instance-field">
+          <label class="section-label" for="instance-name">{t("实例名称")}</label>
+          <div class="input-action"><input id="instance-name" maxlength="64" bind:value={instanceName} /><button disabled={busy} onclick={() => operate('renameInstance', { id: instance.id, name: instanceName })}>{t("重命名")}</button></div>
+        </div>
+        <div class="instance-actions">
+          <button class="instance-action" disabled={busy} onclick={repair} aria-describedby="instance-repair-note">
+            <Icon name="download" size={17} /><span>{t("下载或修复游戏文件")}<small id="instance-repair-note">{t("只下载缺失或损坏的文件。")}</small></span><Icon name="chevron" size={15} />
+          </button>
+          <button class="instance-action" disabled={busy} onclick={() => operate('openDirectory', { id: instance.id })}>
+            <Icon name="folder" size={17} /><span>{t("打开实例目录")}</span><Icon name="chevron" size={15} />
+          </button>
+        </div>
+      </section>
+      <details class="instance-danger">
+        <summary><Icon name="trash" size={16} />{t("删除实例")}<Icon name="chevron" size={15} /></summary>
+        <p class="caption">{t("确认后删除版本目录及其中的文件。共享目录中的存档、模组和资源会保留。")}</p>
+        <button class="danger" disabled={busy} onclick={ondelete}>{t("删除此实例")}</button>
+      </details>
+    </div>
+    <div class="instance-tool-panel" role="tabpanel" id={`${formId}-panel-mods`}
+         aria-labelledby={`${formId}-tab-mods`} hidden={instanceTab !== 'mods'}>
+      {#if openedTools.mods && mods}{@render mods(instance)}{/if}
+    </div>
+    {#if canExport && exportPack}
+      <div class="instance-tool-panel" role="tabpanel" id={`${formId}-panel-packExport`}
+           aria-labelledby={`${formId}-tab-packExport`} hidden={instanceTab !== 'packExport'}>
+        {#if openedTools.packExport}{@render exportPack(instance)}{/if}
+      </div>
+    {/if}
+  {:else}
+    <div class="scroll-pane form-scroll">
       <label class="section-label" for="launcher-language">{t("语言 / Language")}</label>
       <select id="launcher-language" bind:value={locale} disabled={busy || !languageAvailable}>
         {#each $i18n.languages as language}<option value={language.locale}>{language.name}</option>{/each}
@@ -71,23 +168,8 @@
       <label class="section-label" for="download-source">{t("游戏下载源")}</label>
       <select id="download-source" bind:value={source}><option value="official">{t("官方源（Mojang）")}</option><option value="bmclapi">BMCLAPI（bangbang93）</option></select>
       <p class="caption">{source === 'official' ? t("从 Mojang 官方服务下载游戏文件。保存后用于新的下载请求。") : t("使用 BMCLAPI 镜像。保存后用于新的下载请求。")}</p>
-    {/if}
-
-    <label class="section-label" for="java-choice">Java</label>
-    <select id="java-choice" bind:value={java}>
-      <option value="">{instance ? t("跟随启动器设置") : t("自动选择合适的 Java")}</option>{#if instance}<option value="automatic">{t("自动选择合适的 Java")}</option>{/if}
-      {#if java && java !== 'automatic' && !snapshot?.javaRuntimes.some(j => j.path === java)}<option value={java}>{java}</option>{/if}{#each snapshot?.javaRuntimes ?? [] as runtime}<option value={runtime.path}>Java {runtime.version} · {runtime.architecture} · {runtime.path}</option>{/each}
-    </select>
-    <div class="inline-actions java-actions"><button disabled={busy} onclick={() => operate('javaScan')}>{t("重新扫描")}</button><button disabled={busy} onclick={chooseJava}>{t("手动选择…")}</button></div>
-    <h2 class="section-label">{t("最大内存")}</h2><p class="caption">{t("物理内存")} {snapshot?.memory.totalMib ?? '—'} {t("MB · 建议")} {snapshot?.memory.recommendedMib ?? '—'} MB</p>
-    {#if instance}<label class="checkbox-row"><input type="checkbox" bind:checked={inheritMemory} />{t("跟随启动器设置（{0} MB）", snapshot?.settings.maxMemoryMib ?? 4096)}</label>{/if}
-    <div class="memory-editor" class:control-disabled={instance && inheritMemory}>
-      <input type="range" min="512" max={snapshot?.memory.totalMib ?? 65536} step="256" bind:value={memory} disabled={!!instance && inheritMemory} aria-label={t("最大内存")} />
-      <input type="number" min="512" max={snapshot?.memory.totalMib ?? 65536} step="256" bind:value={memory} disabled={!!instance && inheritMemory} aria-label={t("最大内存（MB）")} /><span>MB</span>
-    </div>
-    <p class="caption">{t("按游戏版本与模组数量分配内存，并为系统保留足够空间。")}</p>
-
-    {#if !instance}
+      {@render javaEditor()}
+      {@render memoryEditor()}
       <label class="section-label" for="game-window">{t("游戏窗口")}</label>
       <select id="game-window" bind:value={windowMode}><option value="default">{t("游戏默认")}</option><option value="custom">{t("自定义尺寸")}</option><option value="fullscreen">{t("全屏")}</option></select>
       {#if windowMode === 'custom'}<div class="window-size" in:entrance><input type="number" aria-label={t("窗口宽度")} min="320" max="7680" bind:value={windowWidth} /><span>×</span><input type="number" aria-label={t("窗口高度")} min="240" max="4320" bind:value={windowHeight} /></div>{/if}
@@ -102,21 +184,76 @@
       <p class="caption">{t("对所有版本生效。自动模式将模组版本或已有独立游戏文件的版本放在各自目录，其余使用共享目录。更改后需保存。")}</p>
       <button class="full-width tall legacy-import" onclick={onimport}>{t("导入旧版数据…")}</button><p class="caption">{t("先预览导入内容。原目录与凭据不会被修改。")}</p>
       {#if legacyImport}<p class:issue={legacyImport.phase === 'failed'} class="caption" role="status">{t(legacyImport.message)}{legacyImport.total ? ` · ${(100 * legacyImport.completed / legacyImport.total).toFixed(0)}%` : ''}</p>{#if taskActive(legacyImport) && legacyImport.phase !== 'committing'}<button class="text-button" onclick={() => operate('cancelTask', { id: legacyImport.id })}>{t("取消导入")}</button>{/if}{/if}
-    {/if}
-
-    <details class="expander"><summary>{t("高级 JVM 参数")}</summary>
-      {#if instance}<label class="checkbox-row"><input type="checkbox" bind:checked={inheritJvm} />{t("跟随启动器设置")}</label>{/if}
-      <input aria-label={t("JVM 参数")} placeholder={t("默认留空")} bind:value={jvm} disabled={!!instance && inheritJvm} />
-      <p class="caption">{t("不能设置身份、工作目录、classpath 或内存等由启动器管理的参数。")}</p>
-    </details>
-    {#if instance}
-      <h2 class="section-label">{t("删除实例")}</h2><button class="danger" disabled={busy} onclick={ondelete}>{t("删除此实例")}</button>
-      <p class="caption">{t("确认后删除版本目录及其中的文件。共享目录中的存档、模组和资源会保留。")}</p>
-    {:else}
+      {@render jvmEditor()}
       <details class="expander diagnostics"><summary>{t("关于与界面诊断")}</summary>
-        <dl><dt>{t("当前构建")}</dt><dd>{snapshot ? `${snapshot.version} · ${snapshot.stage}` : t("正在读取")}</dd><dt>{t("窗口材质")}</dt><dd>{t(snapshot?.appearance.reason ?? "正在读取")}</dd><dt>{t("原生圆角")}</dt><dd>{snapshot?.appearance.rounded ? t("已验证窗口区域裁剪") : t("未启用")}</dd><dt>{t("系统 WebView2")}</dt><dd>{snapshot?.webviewVersion || t("正在读取")}</dd><dt>{t("界面字体")}</dt><dd>{t("MiSans / 系统中文字体")}</dd></dl>
+        <dl><dt>{t("当前构建")}</dt><dd>{snapshot ? `${snapshot.version} · ${snapshot.stage}` : t("正在读取")}</dd><dt>{t("窗口材质")}</dt><dd>{t(snapshot?.appearance.reason ?? "正在读取")}</dd><dt>{t("原生圆角")}</dt><dd>{snapshot?.appearance.rounded ? t("已验证窗口区域裁剪") : t("未启用")}</dd><dt>{t("系统 WebView2")}</dt><dd>{snapshot?.webviewVersion || t("正在读取")}</dd><dt>{t("界面字体")}</dt><dd>{t("内置 MiSans / 系统备用字体")}</dd></dl>
       </details>
-    {/if}
-  </div>
-  <footer class="form-footer"><div class="form-feedback">{#if error}<p class="issue" role="alert" in:entrance use:animateText={error}>{error}</p>{:else if message}<p class="caption" role="status" in:entrance use:animateText={message}>{message}</p>{:else if snapshot?.notice}<p class="issue">{t(snapshot.notice)}</p>{/if}</div><button class="save-button" disabled={busy || !snapshot || snapshot.readOnly} onclick={save}>{busy ? t("正在保存…") : t("保存")}</button></footer>
+    </div>
+  {/if}
+  {#if !instance || instanceTab === 'general'}
+    <footer class="form-footer"><div class="form-feedback">{#if error}<p class="issue" role="alert" in:entrance use:animateText={error}>{error}</p>{:else if message}<p class="caption" role="status" in:entrance use:animateText={message}>{message}</p>{:else if snapshot?.notice}<p class="issue">{t(snapshot.notice)}</p>{/if}</div><button class="save-button" class:primary={!!instance} disabled={busy || !snapshot || snapshot.readOnly} onclick={save}>{busy ? t("正在保存…") : t("保存")}</button></footer>
+  {/if}
 </div>
+
+{#snippet javaEditor()}
+  <label class="section-label" for="java-choice">Java</label>
+  <select id="java-choice" bind:value={java}>
+    <option value="">{instance ? t("跟随启动器设置") : t("自动选择合适的 Java")}</option>{#if instance}<option value="automatic">{t("自动选择合适的 Java")}</option>{/if}
+    {#if java && java !== 'automatic' && !snapshot?.javaRuntimes.some(j => j.path === java)}<option value={java}>{java}</option>{/if}{#each snapshot?.javaRuntimes ?? [] as runtime}<option value={runtime.path}>Java {runtime.version} · {runtime.architecture} · {runtime.path}</option>{/each}
+  </select>
+  <div class="inline-actions java-actions"><button disabled={busy} onclick={() => operate('javaScan')}>{t("重新扫描")}</button><button disabled={busy} onclick={chooseJava}>{t("手动选择…")}</button></div>
+{/snippet}
+
+<style>
+  .instance-header { flex-shrink: 0; margin: 12px 24px 12px; }
+  .instance-overview { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 16px; margin-bottom: 14px; border-radius: 12px; background: #f2f4f6; }
+  .instance-emblem { display: grid; place-items: center; flex: 0 0 48px; height: 48px; border-radius: 10px; background: #e4e8ee; color: #3e4a5d; }
+  .instance-identity { flex: 1; min-width: 0; }
+  .instance-identity h2 { font-size: 22px; font-weight: 600; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .instance-identity p { margin-top: 4px; font-size: 14px; color: var(--secondary); overflow-wrap: anywhere; }
+  .instance-status { display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border-radius: 999px; background: #f6eadd; color: #765324; font-size: 12px; white-space: nowrap; }
+  .instance-status.installed { background: #e5efe7; color: #315b3a; }
+  .instance-tabs { flex-wrap: wrap; }
+  .instance-tabs button { display: inline-flex; align-items: center; gap: 8px; }
+  .instance-tabs button.selected { font-weight: 600; }
+  .instance-tool-panel:not([hidden]) { display: flex; flex: 1; min-height: 0; flex-direction: column; }
+  .instance-panel, .instance-danger { min-width: 0; padding: 16px; border: 1px solid var(--stroke); border-radius: 12px; }
+  .instance-panel h2 { font-size: 17px; font-weight: 600; }
+  .instance-panel + .instance-panel { margin-top: 12px; }
+  .instance-field { margin-top: 14px; }
+  .instance-field :global(.section-label) { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: inherit; }
+  .instance-field :global(.caption) { margin-top: 4px; }
+  .instance-field :global(.java-actions) { flex-wrap: wrap; margin-top: 8px; }
+  .instance-field :global(.java-actions button), .instance-field .input-action button { padding: 5px 10px; font-size: 13px; white-space: nowrap; }
+  .instance-field :global(.memory-editor) { grid-template-columns: minmax(0, 1fr) 78px auto; }
+  .instance-field :global(.memory-editor input[type='number']) { width: 100%; margin: 0; }
+  .instance-panel :global(.expander) { margin-top: 14px; border-top: 1px solid #e5e8ec; padding-top: 12px; }
+  .instance-actions { display: grid; gap: 2px; margin-top: 12px; }
+  .instance-action { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; min-height: 40px; padding: 7px 8px; border: 0; box-shadow: none; text-align: left; font-size: 14px; }
+  .instance-action small { display: block; color: var(--secondary); font-size: 12px; margin-top: 3px; }
+  .instance-danger { margin-top: 12px; padding: 12px 16px; }
+  .instance-danger summary { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; color: var(--secondary); font-size: 14px; cursor: pointer; list-style: none; }
+  .instance-danger summary::-webkit-details-marker { display: none; }
+  .instance-danger[open] summary :global(svg:last-child) { transform: rotate(90deg); }
+  .instance-danger button { margin-top: 8px; font-size: 14px; }
+  .instance-form .form-footer { margin-top: 0; padding-top: 9px; border-top: 1px solid #e5e8ec; }
+</style>
+
+{#snippet memoryEditor()}
+  <h3 class="section-label">{t("最大内存")}</h3>
+  <p class="caption">{t("物理内存")} {snapshot?.memory.totalMib ?? '—'} {t("MB · 建议")} {snapshot?.memory.recommendedMib ?? '—'} MB</p>
+  {#if instance}<label class="checkbox-row"><input type="checkbox" bind:checked={inheritMemory} />{t("跟随启动器设置（{0} MB）", snapshot?.settings.maxMemoryMib ?? 4096)}</label>{/if}
+  <div class="memory-editor" class:control-disabled={instance && inheritMemory}>
+    <input type="range" min="512" max={snapshot?.memory.totalMib ?? 65536} step="256" bind:value={memory} disabled={!!instance && inheritMemory} aria-label={t("最大内存")} />
+    <input type="number" min="512" max={snapshot?.memory.totalMib ?? 65536} step="256" bind:value={memory} disabled={!!instance && inheritMemory} aria-label={t("最大内存（MB）")} /><span>MB</span>
+  </div>
+  <p class="caption">{t("按游戏版本与模组数量分配内存，并为系统保留足够空间。")}</p>
+{/snippet}
+
+{#snippet jvmEditor()}
+  <details class="expander"><summary>{t("高级 JVM 参数")}</summary>
+    {#if instance}<label class="checkbox-row"><input type="checkbox" bind:checked={inheritJvm} />{t("跟随启动器设置")}</label>{/if}
+    <input aria-label={t("JVM 参数")} placeholder={t("默认留空")} bind:value={jvm} disabled={!!instance && inheritJvm} />
+    <p class="caption">{t("不能设置身份、工作目录、classpath 或内存等由启动器管理的参数。")}</p>
+  </details>
+{/snippet}

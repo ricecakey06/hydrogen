@@ -3,6 +3,7 @@
   "apiVersion": 1,
   "id": "minecraft.preinstall",
   "name": "游戏预安装",
+  "description": "准备游戏客户端、依赖库和资源文件，使选定版本具备运行所需的文件。",
   "version": "1.0.0",
   "runtime": "native",
   "entry": "bin/plugin.dll",

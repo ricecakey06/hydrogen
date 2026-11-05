@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 1,
+  "id": "minecraft.resources",
+  "name": "资源下载",
+  "description": "搜索 Modrinth 和 CurseForge 模组，下载与实例兼容的版本及所需的前置模组。",
+  "version": "1.0.0",
+  "runtime": "native",
+  "entry": "bin/plugin.dll",
+  "permissions": ["native.code"],
+  "dependencies": [
+    { "id": "network", "version": "^1" },
+    { "id": "minecraft.download", "version": "^1" },
+    { "id": "minecraft.files", "version": "^1" },
+    { "id": "minecraft.mods", "version": "^1" }
+  ],
+  "provides": [
+    {
+      "id": "minecraft.resources",
+      "version": "1.0.0",
+      "methods": ["filters", "search", "versions", "dependencies", "updates", "download", "downloadUpdates", "poll", "cancel"]
+    }
+  ]
+}

@@ -64,7 +64,7 @@ async fn launch(p: Value, job: Arc<Job>) -> Result<Value> {
         "minecraft.instances",
         "minecraft.instances",
         "runDirectory",
-        json!({"root":game_root,"name":name,"isolate":settings.isolate_game_directory.or_else(||instance["components"].is_object().then_some(true))}),
+        json!({"root":game_root,"name":name,"isolate":(instance["isolated"] == true).then_some(true).or(settings.isolate_game_directory).or_else(||instance["components"].is_object().then_some(true))}),
     )?)?;
     metadata["_hydrogenRunDirectory"] = json!(game);
     let required = metadata["javaVersion"]["majorVersion"]

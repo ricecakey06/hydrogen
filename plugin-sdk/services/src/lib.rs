@@ -1,4 +1,5 @@
 pub mod contracts;
+pub mod curseforge;
 pub mod http;
 pub mod jobs;
 pub mod net;

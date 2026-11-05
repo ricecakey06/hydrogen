@@ -109,6 +109,23 @@ pub fn browser(url: &str) -> Result<()> {
             "仅允许打开微软授权页面。",
         ));
     }
+    open_browser(url)
+}
+
+pub fn open_about_link(link: &str) -> Result<()> {
+    let url = match link {
+        "developer" => "https://space.bilibili.com/365980549",
+        "bmclapi" => "https://www.bangbang93.com/",
+        "releases" => "https://github.com/ricecakey06/hydrogen/releases/latest",
+        "miSansLicense" => {
+            "https://hyperos.mi.com/font-download/MiSans%E5%AD%97%E4%BD%93%E7%9F%A5%E8%AF%86%E4%BA%A7%E6%9D%83%E8%AE%B8%E5%8F%AF%E5%8D%8F%E8%AE%AE.pdf"
+        }
+        _ => return Err(ApiError::new("INVALID_BROWSER_URL", "未知的关于页面链接。")),
+    };
+    open_browser(url)
+}
+
+fn open_browser(url: &str) -> Result<()> {
     #[cfg(windows)]
     unsafe {
         use windows::{

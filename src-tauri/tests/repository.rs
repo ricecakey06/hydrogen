@@ -374,6 +374,71 @@ async fn new_install_publishes_repository_named_versions_shared_fabric_libraries
         );
     }
     assert!(!root.join("versions/1.20.1").exists());
+
+    let quilt_jar = "org/quiltmc/quilt-loader/0.29.2/quilt-loader-0.29.2.jar";
+    let quilt_url = "https://maven.quiltmc.org/repository/release/";
+    write(&root, &format!("libraries/{quilt_jar}"), b"quilt");
+    write(
+        &data,
+        &format!(
+            "cache/fabric-hashes/{}.sha1",
+            hash(format!("{quilt_url}{quilt_jar}").as_bytes())
+        ),
+        hash(b"quilt").as_bytes(),
+    );
+    storage::write_json(&data.join("cache/quilt-1.20.1-0.29.2.json"), &json!({
+        "id":"quilt-loader-0.29.2-1.20.1","inheritsFrom":"1.20.1","mainClass":"example.QuiltMain",
+        "libraries":[{"name":"org.quiltmc:quilt-loader:0.29.2","url":quilt_url}]
+    })).unwrap();
+    let mut settings = core.store.lock().unwrap().settings.clone();
+    settings.isolate_game_directory = Some(false);
+    core.save_settings(settings).unwrap();
+
+    let source = fixture.path().join("test.mrpack");
+    {
+        use std::io::Write;
+        let mut archive = zip::ZipWriter::new(fs::File::create(&source).unwrap());
+        let options = zip::write::SimpleFileOptions::default();
+        archive.start_file("modrinth.index.json", options).unwrap();
+        archive.write_all(br#"{"formatVersion":1,"game":"minecraft","name":"Quilt Pack","versionId":"1","files":[],"dependencies":{"minecraft":"1.20.1","quilt-loader":"0.29.2"}}"#).unwrap();
+        archive
+            .start_file("overrides/custom.json", options)
+            .unwrap();
+        archive
+            .write_all(br#"{"mainClass":"not.a.game.manifest"}"#)
+            .unwrap();
+        archive
+            .start_file("overrides/kubejs/startup_scripts/pack.js", options)
+            .unwrap();
+        archive.write_all(b"pack script").unwrap();
+        archive.finish().unwrap();
+    }
+    let task = core.import_modpack(source.clone()).await.unwrap();
+    wait(&core, &task).await;
+    let store = core.store.lock().unwrap();
+    let instance = store
+        .instances()
+        .unwrap()
+        .into_iter()
+        .find(|instance| instance.info.name == "Quilt Pack")
+        .unwrap();
+    let directory = store.game_dir(&instance.info.id).unwrap();
+    assert!(instance.info.is_installed && instance.isolated);
+    assert_eq!(directory, root.join("versions/Quilt Pack"));
+    assert_eq!(
+        fs::read(directory.join("kubejs/startup_scripts/pack.js")).unwrap(),
+        b"pack script"
+    );
+    assert!(!root.join("kubejs").exists());
+    let version = repository::load(&service_client, &root, "Quilt Pack").unwrap();
+    assert_eq!(version.metadata["mainClass"], "example.QuiltMain");
+    drop(store);
+    let second = core.import_modpack(source).await.unwrap();
+    wait(&core, &second).await;
+    assert!(
+        root.join("versions/Quilt Pack (2)/Quilt Pack (2).json")
+            .is_file()
+    );
 }
 
 #[cfg(feature = "desktop")]

@@ -19,9 +19,12 @@ pub struct ModInfo {
     pub version: String,
     pub summary: String,
     pub kind: String,
+    mod_ids: Vec<String>,
     pub file_name: Option<String>,
     pub sha1: Option<String>,
     pub enabled: bool,
+    #[serde(default)]
+    pub duplicate: bool,
     pub icon: Option<String>,
     pub problem: Option<String>,
 }
@@ -76,9 +79,11 @@ pub fn read_archive(path: &Path, sha1: &str) -> ModInfo {
         version: "未知".into(),
         summary: "未提供简介".into(),
         kind: "未知".into(),
+        mod_ids: Vec::new(),
         file_name: Some(filename),
         sha1: Some(sha1.into()),
         enabled,
+        duplicate: false,
         icon: None,
         problem: None,
     };
@@ -102,6 +107,7 @@ pub fn read_archive(path: &Path, sha1: &str) -> ModInfo {
         if let Some(bytes) = archive_bytes(&mut archive, "fabric.mod.json", 1024 * 1024) {
             let value: Value = serde_json::from_slice(&bytes)?;
             apply(&value, "Fabric");
+            info.mod_ids.extend(value["id"].as_str().map(str::to_owned));
             info.kind = format!(
                 "Fabric · {}",
                 match value["environment"].as_str() {
@@ -125,6 +131,7 @@ pub fn read_archive(path: &Path, sha1: &str) -> ModInfo {
             apply(&loader["metadata"], "Quilt");
             if let Some(id) = loader["id"].as_str() {
                 info.id = id.into();
+                info.mod_ids.push(id.into());
             }
             if let Some(version) = loader["version"].as_str() {
                 info.version = version.into();
@@ -140,11 +147,17 @@ pub fn read_archive(path: &Path, sha1: &str) -> ModInfo {
         {
             let value: toml::Value = toml::from_str(&String::from_utf8_lossy(&bytes))
                 .map_err(|_| failure("模组 TOML 元数据无法读取。"))?;
-            let item = value
+            let mods = value
                 .get("mods")
                 .and_then(toml::Value::as_array)
-                .and_then(|a| a.first())
+                .filter(|mods| !mods.is_empty())
                 .ok_or_else(|| failure("模组缺少 mods 字段。"))?;
+            let item = &mods[0];
+            info.mod_ids.extend(mods.iter().filter_map(|item| {
+                item.get("modId")
+                    .and_then(toml::Value::as_str)
+                    .map(str::to_owned)
+            }));
             info.kind = kind.into();
             for (key, target) in [
                 ("modId", &mut info.id),
@@ -175,12 +188,17 @@ pub fn read_archive(path: &Path, sha1: &str) -> ModInfo {
             }
         } else if let Some(bytes) = archive_bytes(&mut archive, "mcmod.info", 1024 * 1024) {
             let value: Value = serde_json::from_slice(&bytes)?;
-            let item = value
+            let mods = value
                 .as_array()
-                .and_then(|a| a.first())
-                .or_else(|| value["modList"].as_array()?.first())
+                .or_else(|| value["modList"].as_array())
+                .filter(|mods| !mods.is_empty())
                 .ok_or_else(|| failure("旧版模组元数据无效。"))?;
+            let item = &mods[0];
             apply(item, "Forge");
+            info.mod_ids.extend(
+                mods.iter()
+                    .filter_map(|item| item["modid"].as_str().map(str::to_owned)),
+            );
             if let Some(id) = item["modid"].as_str() {
                 info.id = id.into();
             }
@@ -207,7 +225,27 @@ pub fn read_archive(path: &Path, sha1: &str) -> ModInfo {
     if let Err(error) = result {
         info.problem = Some(error.message);
     }
+    info.mod_ids.retain(|id| !id.is_empty() && id.len() <= 128);
+    info.mod_ids.sort_unstable();
+    info.mod_ids.dedup();
     info
+}
+
+fn mark_duplicates(items: &mut [ModInfo]) {
+    let mut ids = BTreeMap::new();
+    let mut hashes = BTreeMap::new();
+    for item in items.iter() {
+        for id in &item.mod_ids {
+            *ids.entry(id.clone()).or_insert(0) += 1;
+        }
+        if let Some(hash) = &item.sha1 {
+            *hashes.entry(hash.clone()).or_insert(0) += 1;
+        }
+    }
+    for item in items {
+        item.duplicate = item.mod_ids.iter().any(|id| ids[id] > 1)
+            || item.sha1.as_ref().is_some_and(|hash| hashes[hash] > 1);
+    }
 }
 pub async fn inventory(root: &Path, game: &Path) -> Result<Vec<ModInfo>> {
     let directory = storage::within(game, "mods")?;
@@ -258,19 +296,16 @@ pub async fn inventory(root: &Path, game: &Path) -> Result<Vec<ModInfo>> {
         };
         index["files"][&name] = json!({"length":length,"modified":modified,"hash":hash});
         let cache = storage::within(root, &format!("cache/mods/{hash}.json"))?;
-        let mut item = if cache.exists() {
-            storage::read_json::<ModInfo>(&cache)
-                .ok()
-                .filter(|i| i.sha1.as_deref() == Some(&hash))
-                .unwrap_or_else(|| read_archive(&path, &hash))
-        } else {
-            read_archive(&path, &hash)
-        };
+        let cached = storage::read_json::<ModInfo>(&cache)
+            .ok()
+            .filter(|i| i.sha1.as_deref() == Some(&hash));
+        let mut item = cached.unwrap_or_else(|| {
+            let item = read_archive(&path, &hash);
+            let _ = storage::write_json(&cache, &item);
+            item
+        });
         item.file_name = Some(name.clone());
         item.enabled = !name.to_ascii_lowercase().ends_with(".disabled");
-        if !cache.exists() {
-            let _ = storage::write_json(&cache, &item);
-        }
         if let Some(icon) = &item.icon {
             if icon.len() > icon_budget {
                 item.icon = None;
@@ -280,6 +315,7 @@ pub async fn inventory(root: &Path, game: &Path) -> Result<Vec<ModInfo>> {
         }
         result.push(item);
     }
+    mark_duplicates(&mut result);
     result.sort_by_key(|m| m.english_name.to_lowercase());
     if index != previous {
         let _ = storage::write_json(&index_path, &index);

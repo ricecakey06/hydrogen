@@ -12,9 +12,10 @@ export function preparationSummary(task: Task | undefined) {
   return { progress: fraction, text, detail: active ? `${text} · ${active}` : text };
 }
 
-// GameInstallService.Jobs exposes active and failed installs only.
 export function downloadJobs(tasks: readonly Task[]) {
-  return tasks.filter(task => task.kind === 'install' && (taskActive(task) || task.phase === 'failed'));
+  return tasks.filter(task => ['install', 'modDownload', 'modUpdate', 'modpackImport'].includes(task.kind)
+    && (taskActive(task) || task.phase === 'failed'
+      || task.kind === 'modpackImport' && task.phase === 'cancelled' && task.instanceId));
 }
 export function downloadSummary(jobs: readonly Task[]) {
   const active = jobs.filter(taskActive).length;
@@ -33,7 +34,8 @@ export function downloadItem(task: Task) {
   const progress = task.download;
   const indeterminate = taskActive(task) && !(progress?.total && progress.total > 0);
   const percent = task.phase === 'completed' ? 100 : progress?.total ? Math.max(0, Math.min(100, 100 * progress.completed / progress.total)) : 0;
-  const status = ['queued', 'resolving'].includes(task.phase) ? t("正在获取版本信息") : task.phase === 'completed' ? t("下载完成")
+  const status = task.kind === 'modpackImport' && taskActive(task) ? t(task.message) : task.phase === 'staging' ? t("正在准备替换模组文件…") : task.kind === 'modUpdate' && task.phase === 'committing' ? t("正在提交模组文件…")
+    : ['queued', 'resolving'].includes(task.phase) ? t("正在获取版本信息") : task.phase === 'completed' ? t("下载完成")
     : task.phase === 'cancelled' ? t("已取消") : task.phase === 'failed' ? t("下载失败") : indeterminate ? t("正在获取资源索引") : t("正在下载 · {0}%",Math.round(percent));
   const detail = progress ? `${downloadBytes(progress.completed)} / ${progress.total == null ? t("待统计") : downloadBytes(progress.total)}`
     + (progress.totalFiles > 0 ? t(" · {0} / {1} 个文件",progress.completedFiles,progress.totalFiles) : '') : '';

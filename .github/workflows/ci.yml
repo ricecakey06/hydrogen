@@ -83,9 +83,14 @@ jobs:
       - name: Build frontend packages
         run: npm run build
       - name: Build Release plugins
+        env:
+          HYDROGEN_MICROSOFT_CLIENT_ID: ${{ github.ref == 'refs/heads/tauri' && github.event_name != 'pull_request' && secrets.HYDROGEN_MICROSOFT_CLIENT_ID || '' }}
+          HYDROGEN_CURSEFORGE_API_KEY: ${{ github.ref == 'refs/heads/tauri' && github.event_name != 'pull_request' && secrets.HYDROGEN_CURSEFORGE_API_KEY || '' }}
         run: cargo build --manifest-path official-plugins/Cargo.toml --release --locked
       - name: Build standalone executable
         id: executable
+        env:
+          HYDROGEN_MICROSOFT_CLIENT_ID: ${{ github.ref == 'refs/heads/tauri' && github.event_name != 'pull_request' && secrets.HYDROGEN_MICROSOFT_CLIENT_ID || '' }}
         run: cargo build --manifest-path src-tauri/Cargo.toml --release --locked --features custom-protocol --bin Launcher
       - name: Check packaged startup and bundled plugins
         shell: pwsh

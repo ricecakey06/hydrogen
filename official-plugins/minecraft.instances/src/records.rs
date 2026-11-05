@@ -39,6 +39,8 @@ pub struct Instance {
     pub repository_root: Option<String>,
     #[serde(default)]
     pub loader_name: String,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub isolated: bool,
 }
 pub fn validate_name(name: &str) -> Result<String> {
     let name = name.trim();
@@ -105,6 +107,7 @@ impl Store {
             directory_name: Some(version.name.clone()),
             repository_root: Some(self.game_root.to_string_lossy().into()),
             loader_name: version.loader.clone(),
+            isolated: false,
         }
     }
     pub fn instances(&self) -> Result<Vec<Instance>> {
@@ -209,13 +212,14 @@ impl Store {
         version: &str,
         name: &str,
         components: Option<Components>,
+        pack_stage: Option<&str>,
     ) -> Result<Instance> {
         self.writable()?;
         if version.chars().count() > 100 || !repository::valid_name(version) {
             return Err(ApiError::new("INVALID_VERSION", "游戏版本无效。"));
         }
         if let Some(component) = &components
-            && (!["", "fabric", "forge", "neoforge"].contains(&component.kind.as_str())
+            && (!["", "fabric", "forge", "neoforge", "quilt"].contains(&component.kind.as_str())
                 || component.loader.is_empty()
                 || component.loader.len() > 100
                 || !component
@@ -241,7 +245,8 @@ impl Store {
             .into_iter()
             .find(|i| i.info.name.eq_ignore_ascii_case(&name))
         {
-            if !existing.info.is_installed
+            if pack_stage.is_none()
+                && !existing.info.is_installed
                 && existing.info.game_version == version
                 && existing.components == components
             {
@@ -267,20 +272,53 @@ impl Store {
             components: components.clone(),
             directory_name: Some(name.clone()),
             repository_root: Some(self.game_root.to_string_lossy().into()),
+            isolated: pack_stage.is_some(),
             loader_name: components
                 .as_ref()
                 .map(|c| {
                     match c.kind.as_str() {
                         "forge" => "Forge",
                         "neoforge" => "NeoForge",
+                        "quilt" => "Quilt",
                         _ => "Fabric",
                     }
                     .into()
                 })
                 .unwrap_or_default(),
         };
-        self.write_instance(&instance)?;
-        fs::create_dir_all(self.version_dir(&instance.info.id)?)?;
+        if let Some(stage) = pack_stage {
+            if !id_valid(stage) {
+                return Err(ApiError::new("INVALID_ID", "整合包暂存目录无效。"));
+            }
+            let stage = within(&self.game_root, &format!(".hydrogen-pack-{stage}"))?;
+            let versions = within(&self.game_root, "versions")?;
+            fs::create_dir_all(&versions)?;
+            let destination = within(&versions, &name)?;
+            if ["json", "jar"]
+                .iter()
+                .any(|suffix| stage.join(format!("{name}.{suffix}")).exists())
+            {
+                return Err(ApiError::new(
+                    "INVALID_MODPACK",
+                    "整合包覆盖文件与实例的游戏文件冲突。",
+                ));
+            }
+            // Register the instance before publishing payloads so repository discovery
+            // cannot mistake a pack's top-level config JSON for a game manifest.
+            let record = within(
+                &self.root,
+                &format!("instances/{}/instance.json", instance.info.id),
+            )?;
+            self.write_instance(&instance)?;
+            if let Err(error) = fs::rename(stage, destination) {
+                fs::remove_file(&record)?;
+                let _ = fs::remove_dir(record.parent().unwrap());
+                return Err(error.into());
+            }
+        } else {
+            self.write_instance(&instance)?;
+            fs::create_dir_all(self.version_dir(&instance.info.id)?)?;
+        }
         Ok(instance)
     }
     pub fn game_dir(&self, id: &str) -> Result<PathBuf> {
@@ -291,8 +329,10 @@ impl Store {
         repository::run_directory(
             &self.game_root,
             instance.directory_name.as_deref().unwrap_or(id),
-            self.settings["isolateGameDirectory"]
-                .as_bool()
+            instance
+                .isolated
+                .then_some(true)
+                .or(self.settings["isolateGameDirectory"].as_bool())
                 .or_else(|| instance.components.as_ref().map(|_| true)),
         )
     }

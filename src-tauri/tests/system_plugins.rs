@@ -59,6 +59,25 @@ async fn environment_provider_rejects_unauthorized_browser_schemes_and_reports_d
             .code,
         "INVALID_BROWSER_URL"
     );
+    let about_url = "https://space.bilibili.com/365980549";
+    assert_eq!(
+        environment::browser(&host, &Settings::default(), about_url)
+            .unwrap_err()
+            .code,
+        "INVALID_BROWSER_URL"
+    );
+    assert_eq!(
+        host.call_service(
+            &Settings::default(),
+            "platform.windows.environment",
+            "platform.windows.environment",
+            "openAboutLink",
+            json!({ "link": about_url }),
+        )
+        .unwrap_err()
+        .code,
+        "INVALID_BROWSER_URL"
+    );
     let space = environment::available_space(&host, &Settings::default(), root.path()).unwrap();
     #[cfg(windows)]
     assert!(space.is_some_and(|bytes| bytes > 0));

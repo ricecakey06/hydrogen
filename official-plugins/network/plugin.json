@@ -3,6 +3,7 @@
   "apiVersion": 1,
   "id": "network",
   "name": "网络服务",
+  "description": "为登录、版本查询和下载提供网络请求，并检查连接地址和重定向。",
   "version": "1.0.0",
   "runtime": "native",
   "entry": "bin/plugin.dll",

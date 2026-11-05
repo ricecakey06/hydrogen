@@ -66,6 +66,14 @@ impl Job {
         state.message = message.into();
         state.sequence += 1;
     }
+    pub fn begin_commit(&self, message: &str) -> Result<()> {
+        let mut state = self.state.lock().unwrap();
+        self.check()?;
+        state.phase = "committing".into();
+        state.message = message.into();
+        state.sequence += 1;
+        Ok(())
+    }
     pub fn progress(&self, completed: u64, total: Option<u64>, message: &str) {
         let mut updated = self.updated.lock().unwrap();
         if updated.elapsed().as_millis() < 100 {
@@ -228,7 +236,8 @@ impl Tasks {
         if kind == "install" {
             tasks.retain(|_, job| {
                 let state = job.state.lock().unwrap();
-                state.kind != "install" || state.instance_id.as_deref() != instance
+                !matches!(state.kind.as_str(), "install" | "modpackImport")
+                    || state.instance_id.as_deref() != instance
             });
         }
         if tasks.len() >= 100 {
@@ -290,7 +299,7 @@ impl Tasks {
     pub fn forget_downloads(&self, instance: Option<&str>) {
         self.0.lock().unwrap().retain(|_, job| {
             let state = job.state.lock().unwrap();
-            state.kind != "install"
+            !matches!(state.kind.as_str(), "install" | "modpackImport")
                 || state.active()
                 || instance.is_some_and(|id| state.instance_id.as_deref() != Some(id))
         });

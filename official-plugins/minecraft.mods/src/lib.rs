@@ -6,6 +6,7 @@ use hydrogen_plugin_sdk::{
     contracts::{ApiError, Result},
     serde_json::{Value, json},
 };
+use serde::Deserialize;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
@@ -17,7 +18,16 @@ struct Import {
     game: PathBuf,
     seen: BTreeSet<String>,
     plans: Vec<(PathBuf, PathBuf)>,
+    originals: Vec<mods::ModRef>,
     preserve: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct Update {
+    sha1: String,
+    old: Option<mods::ModRef>,
+    enabled: bool,
 }
 impl Drop for Import {
     fn drop(&mut self) {
@@ -38,28 +48,63 @@ impl Import {
             game: game.into(),
             seen: BTreeSet::new(),
             plans: Vec::new(),
+            originals: Vec::new(),
             preserve: false,
         })
     }
-    async fn add(&mut self, path: &Path) -> Result<()> {
-        if self.seen.len() >= 1000
+    async fn add(&mut self, path: &Path, update: Option<Update>) -> Result<()> {
+        let limit = if update.is_some() { 1127 } else { 1000 };
+        if self.seen.len() >= limit
             || !path.is_absolute()
             || path.ancestors().any(storage::linked)
             || !path.is_file()
         {
             return Err(error("所选文件无效或超过 1000 个文件。"));
         }
-        let name = path
+        let source_name = path
             .file_name()
             .ok_or_else(|| error("文件名无效。"))?
             .to_string_lossy();
+        let old = update.as_ref().and_then(|update| update.old.as_ref());
+        let enabled = if let Some(old) = old {
+            mods::filename(&old.file_name)?;
+            !old.file_name.to_ascii_lowercase().ends_with(".disabled")
+        } else {
+            update.as_ref().is_none_or(|update| update.enabled)
+        };
+        let name = if enabled {
+            source_name.to_string()
+        } else {
+            format!("{source_name}.disabled")
+        };
         mods::filename(&name)?;
         if !self.seen.insert(name.to_lowercase()) {
             return Err(error("选择中包含同名模组。"));
         }
         let destination = storage::within(&self.game, &format!("mods/{name}"))?;
         let hash = net::hash(path).await?;
-        if destination.exists() {
+        if let Some(update) = &update {
+            if !source_name.to_ascii_lowercase().ends_with(".jar")
+                || !hash.eq_ignore_ascii_case(&update.sha1)
+            {
+                return Err(error("已下载的模组校验失败，请重新更新。"));
+            }
+            let opposite = if enabled {
+                format!("{name}.disabled")
+            } else {
+                source_name.to_string()
+            };
+            if storage::within(&self.game, &format!("mods/{opposite}"))?.exists() {
+                return Err(error(
+                    "目标模组已有另一种启用状态的同名文件，请先处理重复模组。",
+                ));
+            }
+        }
+        let same_name = old.is_some_and(|old| old.file_name.to_lowercase() == name.to_lowercase());
+        if destination.exists() && !same_name {
+            if old.is_some() {
+                return Err(error("更新目标文件已存在，请先处理重复模组。"));
+            }
             if net::hash(&destination).await? == hash {
                 return Ok(());
             }
@@ -70,12 +115,29 @@ impl Import {
         if net::hash(&temp).await? != hash {
             return Err(error("导入期间源文件发生变化。"));
         }
+        if let Some(old) = update.and_then(|update| update.old) {
+            self.originals.push(old);
+        }
         self.plans.push((temp, destination));
         Ok(())
     }
-    fn commit(mut self) -> Result<usize> {
+    async fn commit(mut self) -> Result<usize> {
         fs::create_dir_all(storage::within(&self.game, "mods")?)?;
         // Validate every path before moving any file so a late validation failure is atomic.
+        let mut moves = Vec::new();
+        if !self.originals.is_empty() {
+            let backup = storage::within(&self.stage, "originals")?;
+            fs::create_dir(&backup)?;
+            let mut originals = BTreeSet::new();
+            for old in &self.originals {
+                let source = mods::checked(&self.game, old).await?;
+                if !originals.insert(old.file_name.to_lowercase()) {
+                    return Err(error("所选模组文件无效或重复。"));
+                }
+                let destination = storage::within(&backup, &old.file_name)?;
+                moves.push((source, destination));
+            }
+        }
         for (source, destination) in &self.plans {
             storage::within(
                 &self.game,
@@ -86,19 +148,30 @@ impl Import {
             )?;
             storage::within(&self.stage, &source.file_name().unwrap().to_string_lossy())?;
         }
-        let mut done: Vec<(PathBuf, PathBuf)> = Vec::new();
-        for (source, destination) in &self.plans {
+        let count = self.plans.len();
+        moves.append(&mut self.plans);
+        let mut done = Vec::new();
+        for (source, destination) in &moves {
             if let Err(failure) = storage::move_new(source, destination) {
-                for (source, destination) in done.iter().rev() {
+                for &(source, destination) in done.iter().rev() {
                     if storage::move_new(destination, source).is_err() {
                         self.preserve = true;
                     }
                 }
+                if self.preserve && !self.originals.is_empty() {
+                    return Err(ApiError::new(
+                        "MOD_UPDATE_ROLLBACK",
+                        format!(
+                            "无法完整恢复模组文件，备份保留在 {}。",
+                            self.stage.display()
+                        ),
+                    ));
+                }
                 return Err(failure);
             }
-            done.push((source.clone(), destination.clone()));
+            done.push((source, destination));
         }
-        Ok(done.len())
+        Ok(count)
     }
 }
 struct State {
@@ -212,11 +285,12 @@ impl State {
             }
             "importAdd" => {
                 let handle = text(p, "handle")?;
+                let update = serde_json::from_value(p["update"].clone())?;
                 let result = self.runtime.block_on(
                     self.imports
                         .get_mut(handle)
                         .ok_or_else(|| error("导入事务已结束。"))?
-                        .add(Path::new(text(p, "path")?)),
+                        .add(Path::new(text(p, "path")?), update),
                 );
                 if result.is_err() {
                     self.imports.remove(handle);
@@ -224,12 +298,13 @@ impl State {
                 result?;
                 Ok(Value::Null)
             }
-            "importCommit" => Ok(json!(
-                self.imports
+            "importCommit" => {
+                let import = self
+                    .imports
                     .remove(text(p, "handle")?)
-                    .ok_or_else(|| error("导入事务已结束。"))?
-                    .commit()?
-            )),
+                    .ok_or_else(|| error("导入事务已结束。"))?;
+                Ok(json!(self.runtime.block_on(import.commit())?))
+            }
             "importAbort" => {
                 self.imports.remove(text(p, "handle")?);
                 Ok(Value::Null)

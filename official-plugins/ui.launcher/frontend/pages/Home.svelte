@@ -34,7 +34,12 @@
   {:else}<div class="signin-slot" in:entrance|global={{ delay: 30 }}><button class="signin" disabled={!snapshot || !!loginTask} onclick={onlogin}>{account?.mode === 'offline' ? t("登录离线账号") : t("登录微软账号")}</button></div>{/if}
   <p class="version" in:entrance|global={{ delay: 50 }}><span class="motion-text" use:animateText={versionText}>{versionText}</span></p>
   {#if downloads.length}<div class="downloads-slot"><ProgressRing progress={overall.indeterminate ? null : overall.percent / 100} size={50} /><button class="icon-button downloads-entry" aria-label={downloadActionName} title={downloadActionName} onclick={ondownloads}><Icon name="download" size={24} /></button></div>{/if}
-  <div class="launch-slot" in:entrance|global={{ delay: 80 }}>{#if preparing}<ProgressRing progress={launchProgress} />{/if}<button class="launch" aria-label={preparing ? t("取消启动") : t("启动游戏")} disabled={!canLaunch} onclick={() => preparing && launch ? oncancel(launch.id) : onlaunch()}><Icon name={preparing ? 'stop' : 'play'} size={48} width={3.5} /></button></div>
+  <div class="launch-slot" in:entrance|global={{ delay: 80 }}>
+    <button class="launch" aria-label={preparing ? t("取消启动") : t("启动游戏")} disabled={!canLaunch} onclick={() => preparing && launch ? oncancel(launch.id) : onlaunch()}>
+      <Icon name={preparing ? 'stop' : 'play'} size={48} width={3.5} />
+      {#if preparing}<ProgressRing progress={launchProgress} />{/if}
+    </button>
+  </div>
   {#if status}<p class="home-status" class:failed={launch?.phase === 'failed' && !downloading} role="status" in:entrance><span class="motion-text" use:animateText={t(status)} title={t(launch?.phase === 'preparing' ? preparation.detail : status)}>{t(status)}</span>{#if launch?.phase === 'failed' && launch.logPath}{#if launch.crashReport || launch.crashError}<button class="text-button" onclick={() => oncrash(launch.id)}>{t("查看崩溃建议")}</button>{:else}<button class="text-button" onclick={() => onlogs(launch.id)}>{t("打开日志")}</button>{/if}{/if}</p>{/if}
   <p class="launch-label">{preparing ? t("取消启动") : t("启动游戏")}</p>
 </div>

@@ -77,6 +77,7 @@ pub fn resource(
         Some("js") => "text/javascript",
         Some("css") => "text/css",
         Some("png") => "image/png",
+        Some("jpg" | "jpeg") => "image/jpeg",
         Some("svg") => "image/svg+xml",
         Some("woff2") => "font/woff2",
         _ => return Err(ApiError::new("INVALID_RESOURCE", "不支持此界面资源类型。")),

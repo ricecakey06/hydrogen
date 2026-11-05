@@ -16,6 +16,7 @@ pub fn trusted(url: &Url) -> bool {
                 "resources.download.minecraft.net",
                 "textures.minecraft.net",
                 "meta.fabricmc.net",
+                "meta.quiltmc.org",
                 "maven.fabricmc.net",
                 "maven.minecraftforge.net",
                 "files.minecraftforge.net",
@@ -28,6 +29,16 @@ pub fn trusted(url: &Url) -> bool {
                 "cdn.modrinth.com",
                 "cdn.jsdelivr.net",
                 "raw.githubusercontent.com",
+                "github.com",
+                "api.github.com",
+                "objects.githubusercontent.com",
+                "release-assets.githubusercontent.com",
+                "gitlab.com",
+                "api.curseforge.com",
+                "edge.forgecdn.net",
+                "mediafilez.forgecdn.net",
+                "media.forgecdn.net",
+                "mediafiles.forgecdn.net",
                 "bmclapi2.bangbang93.com",
                 "mirror.nju.edu.cn",
                 "login.microsoftonline.com",
@@ -57,7 +68,12 @@ pub fn client() -> Result<Client> {
                     .contains(&h)
                 })
             });
-            if authentication || attempt.previous().len() >= 8 || !trusted(attempt.url()) {
+            // CurseForge's custom API key header is only sent to the original endpoint.
+            if authentication
+                || attempt.previous().first().and_then(Url::host_str) == Some("api.curseforge.com")
+                || attempt.previous().len() >= 8
+                || !trusted(attempt.url())
+            {
                 attempt.stop()
             } else {
                 attempt.follow()

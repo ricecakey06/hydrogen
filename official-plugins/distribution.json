@@ -6,6 +6,8 @@
   "diagnostics": "hydrogen_diagnostics",
   "process": "hydrogen_process",
   "minecraft.mods": "hydrogen_minecraft_mods",
+  "minecraft.modpacks": "hydrogen_minecraft_modpacks",
+  "minecraft.resources": "hydrogen_minecraft_resources",
   "network": "hydrogen_network",
   "account.microsoft": "hydrogen_account_microsoft",
   "account.manager": "hydrogen_account_manager",

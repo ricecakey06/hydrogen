@@ -12,6 +12,8 @@ pub mod launch;
 #[cfg(feature = "desktop")]
 pub mod migration;
 pub mod minecraft;
+#[cfg(feature = "desktop")]
+pub mod modpacks;
 pub mod mods;
 pub mod net;
 pub mod process;

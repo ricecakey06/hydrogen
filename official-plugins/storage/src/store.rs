@@ -57,8 +57,18 @@ impl Store {
                         "配置版本不兼容，原文件已保留。",
                     ));
                 }
+                // Recognize defaults from older releases without embedding their client IDs.
+                use sha1::{Digest, Sha1};
+                let fingerprint = format!(
+                    "{:x}",
+                    Sha1::digest(file.settings.microsoft_client_id.as_bytes())
+                );
                 if file.settings.microsoft_client_id.is_empty()
-                    || file.settings.microsoft_client_id == "c0643bbe-d204-4e4d-a8a2-e57c2497589f"
+                    || matches!(
+                        fingerprint.as_str(),
+                        "4f8912fe204eedbca11659998d88eb86b246b1e3"
+                            | "b93fe959160d79bf027e04f52c63efcee5361f41"
+                    )
                 {
                     file.settings.microsoft_client_id = store.settings.microsoft_client_id.clone();
                 }

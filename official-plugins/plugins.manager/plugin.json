@@ -3,6 +3,7 @@
   "apiVersion": 1,
   "id": "plugins.manager",
   "name": "插件管理",
+  "description": "查看插件信息和依赖，安装本地插件包，并管理插件的启停和卸载。",
   "version": "1.0.0",
   "runtime": "native",
   "entry": "bin/plugin.dll",

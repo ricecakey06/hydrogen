@@ -481,8 +481,8 @@ async fn every_distribution_has_payload_and_frontend_assets_use_installed_integr
     let root = tempfile::tempdir().unwrap();
     manager::initialize(root.path()).unwrap();
     let plugins = manager::load(root.path(), &[]).unwrap();
-    assert_eq!(plugins.len(), 26);
-    assert_eq!(builtin::PACKAGES.len(), 26);
+    assert_eq!(plugins.len(), 28);
+    assert_eq!(builtin::PACKAGES.len(), 28);
     let host = host(root.path());
     let settings = Settings::default();
     for plugin in &plugins {

@@ -4,29 +4,38 @@
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { PhysicalPosition, PhysicalSize } from '@tauri-apps/api/dpi';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-  import { invoke, action, errorMessage, taskActive, type Snapshot, type Profile } from './lib/api';
+  import { invoke, action, errorMessage, taskActive, type Snapshot, type Profile, type InstanceInfo } from './lib/api';
   import { animateText, entrance, fadeSlide } from './lib/motion';
   import Icon from './components/Icon.svelte';
   import Versions from '../../ui.launcher/frontend/pages/Versions.svelte';
-  import SettingsForm from '../../ui.launcher/frontend/pages/SettingsForm.svelte';
+  import SettingsForm, { type InstanceSettingsTab } from '../../ui.launcher/frontend/pages/SettingsForm.svelte';
+  import About from '../../ui.launcher/frontend/pages/About.svelte';
   import Plugins from '../../plugins.manager/frontend/Plugins.svelte';
   import Mods from '../../ui.launcher/frontend/pages/Mods.svelte';
   import Home from '../../ui.launcher/frontend/pages/Home.svelte';
   import Downloads from '../../ui.launcher/frontend/pages/Downloads.svelte';
+  import Resources, { type ResourceDetail } from '../../ui.launcher/frontend/pages/Resources.svelte';
   import CrashReport from '../../ui.launcher/frontend/pages/CrashReport.svelte';
 
+  import Modpacks from '../../ui.launcher/frontend/pages/Modpacks.svelte';
   import Profiles from '../../ui.launcher/frontend/pages/Profiles.svelte';
 
-  type Page = 'profiles' | 'home' | 'versions' | 'instance' | 'settings' | 'mods' | 'downloads' | 'crash';
+  type Page = 'profiles' | 'home' | 'versions' | 'instance' | 'settings' | 'downloads' | 'crash' | 'resources';
   type ResizeDirection = Parameters<ReturnType<typeof getCurrentWindow>['startResizeDragging']>[0];
   let page = $state<Page>('home');
   let sidebarCollapsed = $state(false);
   let navigationDirection = $state(1);
-  let settingsTab = $state('general');
+  let settingsTab = $state<'general' | 'plugins' | 'about'>('general');
   let versionMode = $state<'instances' | 'catalog' | 'configure'>('instances');
   let selectedPluginId = $state('');
   let snapshot = $state<Snapshot | null>(null);
+  let resourceTrail = $state<ResourceDetail[]>([]);
+  const resourcesAvailable = $derived(snapshot?.plugins.some(plugin => plugin.id === 'minecraft.resources' && plugin.enabled && !plugin.problem));
+  const modpacksAvailable = $derived(snapshot?.plugins.some(plugin => plugin.id === 'minecraft.modpacks' && plugin.enabled && !plugin.problem));
+  let resourceExpanded = $state(false);
+  const showResourceMenu = $derived(page === 'resources' && resourceExpanded);
   let editingInstanceId = $state('');
+  let instanceTab = $state<InstanceSettingsTab>('general');
   let crashTaskId = $state('');
   const shownCrashes = new Set<string>();
   const crashTask = $derived(snapshot?.tasks.find(task => task.id === crashTaskId));
@@ -41,7 +50,7 @@
   let resizeQueued = false;
   const selected = $derived(snapshot?.instances.find(i => i.id === snapshot?.selectedInstanceId));
   const editing = $derived(snapshot?.instances.find(i => i.id === editingInstanceId) ?? selected);
-  function pageTitle(active: Page) { return active === 'instance' ? t("版本设置 · {0}", editing?.name ?? '') : active === 'mods' ? t("模组管理 · {0}", editing?.name ?? '') : ({ home: '', versions: t("版本选择"), profiles: t("档案管理"), settings: t("启动器设置"), downloads: t("下载管理"), crash: t("崩溃分析") } as Partial<Record<Page, string>>)[active]; }
+  function pageTitle(active: Page) { return { home: '', versions: t("版本选择"), instance: t("版本设置"), profiles: t("档案管理"), settings: t("启动器设置"), downloads: t("下载管理"), crash: t("崩溃分析"), resources: t("资源下载") }[active]; }
   function showCrash(id: string) { crashTaskId = id; navigate('crash'); }
   $effect(() => {
     if (modal) return;
@@ -58,13 +67,23 @@
   async function load() { const sequence = ++requestSequence; const next = await invoke<Snapshot>('app_snapshot'); if (sequence < appliedSequence) return; appliedSequence = sequence; next.plugins = stable(next.plugins, snapshot?.plugins); next.instances = stable(next.instances, snapshot?.instances); next.settings = stable(next.settings, snapshot?.settings); next.javaRuntimes = stable(next.javaRuntimes, snapshot?.javaRuntimes); next.account = stable(next.account, snapshot?.account); snapshot = next; document.documentElement.dataset.material = next.appearance.material; await loadLanguage(next.dataDirectory, next.settings.locale, next.plugins.find(p => p.id === 'i18n')); }
   async function operate(type: string, fields: Record<string, unknown> = {}) { try { await action(type, fields); await load(); } catch (e) { error = errorMessage(e); } }
   let downloadError = $state('');
+  function showDownloads() { downloadError = ''; navigate('downloads'); }
+  async function importModpack() {
+    try { if (await action<string | null>('modpackImport')) showDownloads(); }
+    catch (e) { error = errorMessage(e); }
+  }
   async function startInstall(id: string) { downloadError = ''; navigate('downloads'); try { await action('repair', { id }); await load(); } catch (e) { downloadError = errorMessage(e); } }
-  function navigate(next: Page) { navigationDirection = next === 'home' ? -1 : 1; page = next; error = ''; selectedPluginId = ''; void load().catch(e => error = errorMessage(e)); }
-  function showSettings(id: string) { editingInstanceId = id; navigate('instance'); }
+  function navigate(next: Page) { navigationDirection = next === 'home' ? -1 : 1; page = next; error = ''; selectedPluginId = ''; resourceTrail = []; void load().catch(e => error = errorMessage(e)); }
+  function toggleResources() {
+    if (page === 'resources') { resourceExpanded = !resourceExpanded; return; }
+    resourceExpanded = true;
+    navigate('resources');
+  }
+  function showSettings(id: string) { editingInstanceId = id; instanceTab = 'general'; navigate('instance'); }
   function back() {
     if (selectedPluginId) { selectedPluginId = ''; return; }
+    if (page === 'resources' && resourceTrail.length) { resourceTrail = resourceTrail.slice(0, -1); return; }
     if (page === 'versions' && versionMode !== 'instances') { versionMode = versionMode === 'configure' ? 'catalog' : 'instances'; return; }
-    if (page === 'mods') { navigate('instance'); return; }
     if (page === 'instance') { versionMode = 'instances'; navigate('versions'); return; }
     navigate('home');
   }
@@ -173,14 +192,18 @@
   onMount(() => {
     fit();
     let stopped = false;
-    let unlisten: UnlistenFn | undefined;
+    const unlisteners: UnlistenFn[] = [];
     void listen<{ token: string; count: number }>('mod-files-dropped', event => {
-      if (page === 'mods' && editing) {
+      if (page === 'instance' && instanceTab === 'mods' && editing) {
         const id = editing.id;
         void openModal(t("导入模组"), t("将 {0} 个文件导入“{1}”。同名文件不会被覆盖。", event.payload.count, editing.name), false, async () => { await action('modsDropped', { id, token: event.payload.token }); await load(); }, t("导入"));
       } else void openModal(t("导入模组"), t("请先打开目标实例的模组管理页面，再拖入模组文件。"));
-    }).then(value => { if (stopped) value(); else unlisten = value; }).catch(e => error = errorMessage(e));
-    return () => { stopped = true; unlisten?.(); };
+    }).then(value => { if (stopped) value(); else unlisteners.push(value); }).catch(e => error = errorMessage(e));
+    void listen<{ message: string } | null>('modpack-drop', event => {
+      if (event.payload) error = errorMessage(event.payload);
+      else showDownloads();
+    }).then(value => { if (stopped) value(); else unlisteners.push(value); }).catch(e => error = errorMessage(e));
+    return () => { stopped = true; unlisteners.forEach(unlisten => unlisten()); };
   });
 
 </script>
@@ -197,11 +220,26 @@
     <main class="window-body" inert={!!modal}>
       <nav id="main-navigation" class="sidebar" aria-label={t("主导航")}>
         <button class:active={page === 'home'} aria-label={t("启动游戏")} title={sidebarCollapsed ? t("启动游戏") : undefined} onclick={() => navigate('home')}><Icon name="circle-play" /><span class="nav-label">{t("启动游戏")}</span></button>
-        <button class:active={page === 'versions' || page === 'instance' || page === 'mods'} aria-label={t("版本选择")} title={sidebarCollapsed ? t("版本选择") : undefined} onclick={() => { versionMode = 'instances'; navigate('versions'); }}><Icon name="cube" /><span class="nav-label">{t("版本选择")}</span></button>
+        <button class:active={page === 'versions' || page === 'instance'} aria-label={t("版本选择")} title={sidebarCollapsed ? t("版本选择") : undefined} onclick={() => { versionMode = 'instances'; navigate('versions'); }}><Icon name="cube" /><span class="nav-label">{t("版本选择")}</span></button>
+        {#if resourcesAvailable}
+          <div class="resource-menu">
+            <button class="resource-trigger" class:active={page === 'resources' && !showResourceMenu} aria-label={t("资源下载")} title={sidebarCollapsed ? t("资源下载") : undefined} aria-expanded={showResourceMenu} aria-controls={showResourceMenu ? 'resource-navigation' : undefined} onclick={toggleResources}>
+              <Icon name="download" /><span class="nav-label">{t("资源下载")}</span>
+              <span class="nav-chevron" class:expanded={showResourceMenu}><Icon name="chevron" size={16} /></span>
+            </button>
+            {#if showResourceMenu}
+              <div id="resource-navigation" class="resource-subnav" role="group" aria-label={t("资源分类")} in:entrance>
+                <button class="active" aria-current="page" aria-label={t("模组下载")} title={sidebarCollapsed ? t("模组下载") : undefined} onclick={() => resourceTrail = []}>
+                  <Icon name="puzzle" size={18} /><span class="nav-label">{t("模组下载")}</span>
+                </button>
+              </div>
+            {/if}
+          </div>
+        {/if}
         <button class:active={page === 'profiles'} aria-label={t("档案管理")} title={sidebarCollapsed ? t("档案管理") : undefined} onclick={() => navigate('profiles')}><Icon name="profiles" /><span class="nav-label">{t("档案管理")}</span></button>
         <p class="nav-section">{t("扩展")}</p>
         <button class:active={page === 'settings' && settingsTab === 'plugins'} aria-label={t("插件")} title={sidebarCollapsed ? t("插件") : undefined} onclick={() => { settingsTab = 'plugins'; navigate('settings'); }}><Icon name="puzzle" /><span class="nav-label">{t("插件")}</span></button>
-        <div class="sidebar-footer"><button class:active={page === 'settings' && settingsTab === 'general'} aria-label={t("启动器设置")} title={sidebarCollapsed ? t("启动器设置") : undefined} onclick={() => { settingsTab = 'general'; navigate('settings'); }}><Icon name="gear" /><span class="nav-label">{t("启动器设置")}</span></button></div>
+        <div class="sidebar-footer"><button class:active={page === 'settings' && settingsTab !== 'plugins'} aria-label={t("启动器设置")} title={sidebarCollapsed ? t("启动器设置") : undefined} onclick={() => { settingsTab = 'general'; navigate('settings'); }}><Icon name="gear" /><span class="nav-label">{t("启动器设置")}</span></button></div>
       </nav>
       {#each [page] as activePage (activePage)}
       <div class="route-layer" aria-hidden={page !== activePage} inert={page !== activePage} in:fadeSlide|global={{ direction: navigationDirection }} out:fadeSlide={{ direction: navigationDirection }}>
@@ -211,13 +249,28 @@
         <div class="page-shell"><div class="page-heading"><button class="icon-button back-button" aria-label={t("返回")} onclick={back}><Icon name="back" size={22} width={2.5} /></button><h1 use:animateText={pageTitle(activePage)}>{pageTitle(activePage)}</h1></div>
           {#if activePage === 'crash'}{#key crashTaskId}<CrashReport task={crashTask} onhome={() => navigate('home')} />{/key}
           {:else if activePage === 'profiles'}<Profiles {snapshot} onchange={load} ondelete={deleteProfile} />
-          {:else if activePage === 'versions'}<Versions {snapshot} bind:mode={versionMode} onselect={select} onsettings={showSettings} onlaunch={launchInstance} ondownloads={() => { downloadError = ''; navigate('downloads'); }} onchange={load} />
-          {:else if activePage === 'instance'}<SettingsForm onprofiles={() => navigate('profiles')} instance={editing} {snapshot} onmods={() => navigate('mods')} onlogin={login} onchange={load} ondelete={deleteInstance} onimport={importLegacy} onrepair={id => { void startInstall(id); }} />
-          {:else if activePage === 'mods'}<Mods instance={editing} {snapshot} onchange={load} onconfirm={(title, description, confirm) => { void openModal(title, description, false, confirm, t("确认删除")); }} />
+          {:else if activePage === 'versions'}<Versions {snapshot} bind:mode={versionMode} onselect={select} onsettings={showSettings} onlaunch={launchInstance} onimportpack={modpacksAvailable ? importModpack : undefined} ondownloads={showDownloads} onchange={load} />
+          {:else if activePage === 'instance'}
+            {#snippet packPanel(instance: InstanceInfo)}<Modpacks {instance} {snapshot} onchange={load} />{/snippet}
+            <SettingsForm onprofiles={() => navigate('profiles')} instance={editing} {snapshot} bind:instanceTab exportPack={modpacksAvailable ? packPanel : undefined} onlogin={login} onchange={load} ondelete={deleteInstance} onimport={importLegacy} onrepair={id => { void startInstall(id); }}>
+              {#snippet mods(instance: InstanceInfo)}<Mods {instance} {snapshot} onchange={load} onconfirm={(title, description, confirm) => { void openModal(title, description, false, confirm, t("确认删除")); }} />{/snippet}
+            </SettingsForm>
           {:else if activePage === 'settings'}
-            <div class="settings-tabs"><div class="segmented" role="group" aria-label={t("启动器设置分类")}><button class:selected={settingsTab === 'general'} aria-pressed={settingsTab === 'general'} onclick={() => { settingsTab = 'general'; selectedPluginId = ''; }}>{t("常规")}</button><button class:selected={settingsTab === 'plugins'} aria-pressed={settingsTab === 'plugins'} onclick={() => settingsTab = 'plugins'}>{t("插件")}</button></div></div>
-            {#key settingsTab}<div class="tab-content" in:entrance|global>{#if settingsTab === 'general'}<SettingsForm onprofiles={() => navigate('profiles')} {snapshot} onmods={() => navigate('mods')} onlogin={login} onchange={load} ondelete={deleteInstance} onimport={importLegacy} onrepair={id => { void startInstall(id); }} />{:else}<Plugins plugins={snapshot?.plugins ?? []} bind:selectedId={selectedPluginId} oninstall={installPlugin} onuninstall={uninstallPlugin} onrefresh={refreshPlugins} />{/if}</div>{/key}
-          {:else if activePage === 'downloads'}<Downloads {snapshot} onchange={load} onhome={() => navigate('home')} onrepair={startInstall} startError={downloadError} />{/if}
+            <div class="settings-tabs"><div class="segmented" role="group" aria-label={t("启动器设置分类")}>
+              <button class:selected={settingsTab === 'general'} aria-pressed={settingsTab === 'general'} onclick={() => { settingsTab = 'general'; selectedPluginId = ''; }}>{t("常规")}</button>
+              <button class:selected={settingsTab === 'plugins'} aria-pressed={settingsTab === 'plugins'} onclick={() => settingsTab = 'plugins'}>{t("插件")}</button>
+              <button class:selected={settingsTab === 'about'} aria-pressed={settingsTab === 'about'} onclick={() => { settingsTab = 'about'; selectedPluginId = ''; }}>{t("关于")}</button>
+            </div></div>
+            {#key settingsTab}<div class="tab-content" in:entrance|global>
+              {#if settingsTab === 'general'}<SettingsForm onprofiles={() => navigate('profiles')} {snapshot} onlogin={login} onchange={load} ondelete={deleteInstance} onimport={importLegacy} onrepair={id => { void startInstall(id); }} />
+              {:else if settingsTab === 'plugins'}<Plugins plugins={snapshot?.plugins ?? []} bind:selectedId={selectedPluginId} oninstall={installPlugin} onuninstall={uninstallPlugin} onrefresh={refreshPlugins} />
+              {:else}<About version={snapshot?.version} />{/if}
+            </div>{/key}
+          {:else if activePage === 'downloads'}<Downloads {snapshot} onchange={load} onhome={() => navigate('home')} onrepair={startInstall} startError={downloadError} />
+          {:else if activePage === 'resources'}
+            {#if resourcesAvailable}<Resources {snapshot} bind:trail={resourceTrail} onchange={load} />
+            {:else}<p class="empty-state">{t("资源下载插件不可用。")}</p>{/if}
+          {/if}
         </div>
       {/if}
       </div>

@@ -30,8 +30,8 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' http://hydrogen-ui.localhost hydrogen-ui:; style-src 'self' http://hydrogen-ui.localhost hydrogen-ui: 'unsafe-inline'; img-src 'self' http://hydrogen-ui.localhost hydrogen-ui: data:; font-src 'self' http://hydrogen-ui.localhost hydrogen-ui:; connect-src ipc: http://ipc.localhost; frame-src http://hydrogen-plugin.localhost hydrogen-plugin:; object-src 'none'; base-uri 'none'; form-action 'none'",
-      "devCsp": "default-src 'self'; script-src 'self' http://hydrogen-ui.localhost hydrogen-ui: 'unsafe-inline'; style-src 'self' http://hydrogen-ui.localhost hydrogen-ui: 'unsafe-inline'; img-src 'self' http://hydrogen-ui.localhost hydrogen-ui: data:; connect-src ipc: http://ipc.localhost http://127.0.0.1:1420 ws://127.0.0.1:1420; frame-src http://hydrogen-plugin.localhost hydrogen-plugin:; object-src 'none'; base-uri 'none'; form-action 'none'",
+      "csp": "default-src 'self'; script-src 'self' http://hydrogen-ui.localhost hydrogen-ui:; style-src 'self' http://hydrogen-ui.localhost hydrogen-ui: 'unsafe-inline'; img-src 'self' http://hydrogen-ui.localhost hydrogen-ui: data: https://cdn.modrinth.com https://media.forgecdn.net https://mediafiles.forgecdn.net https://mediafilez.forgecdn.net https://edge.forgecdn.net; font-src 'self' http://hydrogen-ui.localhost hydrogen-ui:; connect-src ipc: http://ipc.localhost; frame-src http://hydrogen-plugin.localhost hydrogen-plugin:; object-src 'none'; base-uri 'none'; form-action 'none'",
+      "devCsp": "default-src 'self'; script-src 'self' http://hydrogen-ui.localhost hydrogen-ui: 'unsafe-inline'; style-src 'self' http://hydrogen-ui.localhost hydrogen-ui: 'unsafe-inline'; img-src 'self' http://hydrogen-ui.localhost hydrogen-ui: data: https://cdn.modrinth.com https://media.forgecdn.net https://mediafiles.forgecdn.net https://mediafilez.forgecdn.net https://edge.forgecdn.net; connect-src ipc: http://ipc.localhost http://127.0.0.1:1420 ws://127.0.0.1:1420; frame-src http://hydrogen-plugin.localhost hydrogen-plugin:; object-src 'none'; base-uri 'none'; form-action 'none'",
       "capabilities": [
         "main"
       ]

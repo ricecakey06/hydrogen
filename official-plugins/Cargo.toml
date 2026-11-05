@@ -1,5 +1,5 @@
 [workspace]
-members = ["i18n", "account.offline", "java.runtime", "example.counter", "example.counter.v2", "credentials", "platform.windows.environment", "diagnostics", "process", "minecraft.mods", "example.services", "network", "account.microsoft", "account.manager", "minecraft.download", "minecraft.files", "minecraft.content", "minecraft.fabric", "minecraft.forge", "minecraft.preinstall", "minecraft.instances", "storage", "minecraft.install", "minecraft.launch", "minecraft.crash", "platform.windows.window", "ui.shell", "ui.launcher", "plugins.manager"]
+members = ["i18n", "account.offline", "java.runtime", "example.counter", "example.counter.v2", "credentials", "platform.windows.environment", "diagnostics", "process", "minecraft.mods", "minecraft.modpacks", "minecraft.resources", "example.services", "network", "account.microsoft", "account.manager", "minecraft.download", "minecraft.files", "minecraft.content", "minecraft.fabric", "minecraft.forge", "minecraft.preinstall", "minecraft.instances", "storage", "minecraft.install", "minecraft.launch", "minecraft.crash", "platform.windows.window", "ui.shell", "ui.launcher", "plugins.manager"]
 resolver = "3"
 
 [profile.release]

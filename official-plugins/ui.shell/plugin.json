@@ -3,6 +3,7 @@
   "apiVersion": 1,
   "id": "ui.shell",
   "name": "窗口与外壳",
+  "description": "提供启动器主窗口的标题栏、侧栏导航和页面切换。",
   "version": "1.0.0",
   "runtime": "native",
   "entry": "bin/plugin.dll",

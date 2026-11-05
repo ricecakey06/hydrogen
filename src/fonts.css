@@ -1,0 +1,6 @@
+@font-face {
+  font-family: 'Hydrogen MiSans';
+  src: url('./assets/MiSansVF.ttf') format('truetype');
+  font-weight: 150 700;
+  font-display: swap;
+}

@@ -3,6 +3,7 @@
   "apiVersion": 1,
   "id": "storage",
   "name": "配置与存储",
+  "description": "读取、校验和保存启动器配置，并解析实例实际使用的 Java、内存和 JVM 参数。",
   "version": "1.0.0",
   "runtime": "native",
   "entry": "bin/plugin.dll",

@@ -3,6 +3,7 @@
   "apiVersion": 1,
   "id": "ui.launcher",
   "name": "启动器界面",
+  "description": "提供启动游戏、版本选择、实例设置和下载管理等常用页面。",
   "version": "1.0.0",
   "runtime": "native",
   "entry": "bin/plugin.dll",

@@ -3,7 +3,7 @@
   "apiVersion": 1,
   "id": "i18n",
   "name": "多语言支持",
-  "description": "启动器语言包与游戏默认语言。",
+  "description": "加载启动器语言包，并为 Minecraft 设置默认语言，保留玩家手动选择的语言。",
   "version": "1.0.0",
   "runtime": "native",
   "entry": "bin/plugin.dll",

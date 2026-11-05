@@ -1,24 +1,30 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { t } from '../../../ui.shell/frontend/lib/i18n';
   import Icon from '../../../ui.shell/frontend/components/Icon.svelte';
   import { action, errorMessage, taskActive, type Snapshot, type GameVersion } from '../../../ui.shell/frontend/lib/api';
   import { entrance } from '../../../ui.shell/frontend/lib/motion';
   // Keep selection primary within each row, with neutral 44px settings/launch actions (§2.8, §3.2).
-  let { snapshot, mode = $bindable('instances'), onselect, onsettings, onlaunch, ondownloads, onchange }: {
+  let { snapshot, mode = $bindable('instances'), onselect, onsettings, onlaunch, ondownloads, onimportpack, onchange }: {
     snapshot: Snapshot | null; mode: 'instances' | 'catalog' | 'configure';
-    onselect: (id: string) => void; onsettings: (id: string) => void; onlaunch: (id: string) => Promise<void>; ondownloads: () => void; onchange: () => Promise<void>;
+    onselect: (id: string) => void; onsettings: (id: string) => void; onlaunch: (id: string) => Promise<void>; ondownloads: () => void; onimportpack?: () => void; onchange: () => Promise<void>;
   } = $props();
+  const loaderKinds = ['fabric', 'forge', 'neoforge'] as const;
+  type LoaderKind = typeof loaderKinds[number];
+  type Component = LoaderKind | 'fabricApi';
+  const componentNames = { fabric: 'Fabric', forge: 'Forge', neoforge: 'NeoForge', fabricApi: 'Fabric API' };
   let selectedVersion = $state('');
   let newName = $state('');
-  let expanded = $state('');
+  let expanded = $state<Component | ''>('');
   let launching = $state('');
   let versions = $state<GameVersion[]>([]); let catalogKey = $state(''); let busy = $state(false); let error = $state('');
-  let loader = $state(''); let loaderKind = $state('fabric'); let fabricApi = $state(''); let optionsBusy = $state(false);
+  let loader = $state(''); let loaderKind = $state<LoaderKind>('fabric'); let fabricApi = $state(''); let optionsBusy = $state(false);
+  const visibleComponents = $derived<readonly Component[]>(!loader ? loaderKinds : loaderKind === 'fabric' ? ['fabric', 'fabricApi'] : [loaderKind]);
   let filter = $state('release'); let search = $state(''); let optionsError = $state('');
   type Loader = { id: string; stable: boolean };
   let options = $state<{ loaders: Loader[]; api: { id: string; version_number: string; version_type: string }[] }>({ loaders: [], api: [] });
-  let forgeOptions = $state<Record<string, Loader[]>>({ forge: [], neoforge: [] });
-  let loaded = $state<string[]>([]); let request = 0;
+  let forgeOptions = $state<Record<'forge' | 'neoforge', Loader[]>>({ forge: [], neoforge: [] });
+  let loaded = $state<LoaderKind[]>([]); let request = 0;
   const visibleVersions = $derived(versions.filter(v => (filter === 'all' || v.versionType === filter) && v.id.toLowerCase().includes(search.toLowerCase())));
   const installed = $derived(snapshot?.instances.filter(instance => instance.isInstalled) ?? []);
   const login = $derived(snapshot?.tasks.some(task => task.kind === 'login' && taskActive(task)));
@@ -28,10 +34,10 @@
     request++; selectedVersion = version; newName = version; loader = ''; loaderKind = 'fabric'; fabricApi = ''; expanded = ''; error = ''; optionsError = ''; mode = 'configure'; optionsBusy = false;
     options = { loaders: [], api: [] }; forgeOptions = { forge: [], neoforge: [] }; loaded = [];
   }
-  async function expandComponent(component: string) {
+  async function expandComponent(component: Component) {
     if (expanded === component) { expanded = ''; return; }
     expanded = component; optionsError = '';
-    const kind = component === 'NeoForge' ? 'neoforge' : component === 'Forge' ? 'forge' : 'fabric';
+    const kind = component === 'fabricApi' ? 'fabric' : component;
     if (loaded.includes(kind)) return;
     const current = ++request;
     optionsBusy = true;
@@ -47,8 +53,10 @@
     } catch (e) { if (current === request) optionsError = errorMessage(e); }
     finally { if (current === request) optionsBusy = false; }
   }
-  function chooseLoader(kind: string, version: string) {
+  async function chooseLoader(kind: LoaderKind, version: string) {
     loaderKind = kind; loader = version; fabricApi = ''; expanded = '';
+    await tick();
+    document.getElementById('install-component-' + kind)?.focus();
   }
   async function install() { busy = true; error = ''; try { await action('createInstance', { version: selectedVersion, name: newName, components: loader ? { kind: loaderKind, loader, fabricApi: fabricApi || null } : null }); await onchange(); mode = 'instances'; ondownloads(); } catch (e) { error = errorMessage(e); } finally { busy = false; } }
   async function launch(id: string) {
@@ -61,7 +69,7 @@
 <div class="versions-page">
   {#key mode}<div class="version-pane" in:entrance|global>
   {#if mode === 'instances'}
-    <div class="section-row"><h2 class="section-label">{t("已安装实例")}</h2></div>
+    <div class="section-row"><h2 class="section-label">{t("已安装实例")}</h2>{#if onimportpack}<button class="text-button" disabled={snapshot?.readOnly} onclick={onimportpack}>{t("导入整合包")}</button>{/if}</div>
     <div class="scroll-pane instances-list">
       {#each installed as instance (instance.id)}
         {@const activeTask = snapshot?.tasks.find(task => task.instanceId === instance.id && taskActive(task))}
@@ -76,7 +84,7 @@
         </div>
       {:else}<div class="empty-state">{t("还没有安装完成的实例")}</div>{/each}
     </div>
-    <div class="versions-footer"><p class="caption">{installed.length} {t("个隔离实例 · 各自保留模组与存档")}</p><button class="full-width" onclick={() => mode = 'catalog'}>{t("添加版本")}</button></div>
+    <div class="versions-footer"><p class="caption">{onimportpack ? t("将 .mrpack 或 .zip 整合包拖入窗口即可安装。") : `${installed.length} ${t("个隔离实例 · 各自保留模组与存档")}`}</p><button class="full-width" onclick={() => mode = 'catalog'}>{t("添加版本")}</button></div>
   {:else if mode === 'catalog'}
     <div class="section-row"><h2 class="section-label">{t("选择游戏版本")}</h2><button class="text-button" disabled={busy} onclick={refreshVersions}>{t("刷新目录")}</button></div>
     <div class="field-row">
@@ -93,24 +101,27 @@
   {:else}
     <div class="scroll-pane installation-form">
       <div class="install-name"><div><small>Minecraft</small><span>{selectedVersion}</span></div><input aria-label={t("新实例名称")} maxlength="64" bind:value={newName} placeholder={t("实例名称")} /></div>
-      <h2 class="section-label">{t("快捷安装")}</h2>
-      {#each ['Fabric', 'Forge', 'NeoForge', 'Fabric API'] as component}
-        {@const kind = component === 'NeoForge' ? 'neoforge' : component === 'Forge' ? 'forge' : 'fabric'}
+      <div class="section-row">
+        <h2 class="section-label">{t("快捷安装")}</h2>
+        {#if loader}<button type="button" class="text-button" disabled={busy || optionsBusy} onclick={() => chooseLoader(loaderKind, '')}>{t("清除加载器")}</button>{/if}
+      </div>
+      {#each visibleComponents as component (component)}
+        {@const kind = component === 'fabricApi' ? 'fabric' : component}
         {@const choices = kind === 'fabric' ? options.loaders : forgeOptions[kind]}
-        <button class="component-choice" disabled={optionsBusy || busy} aria-expanded={expanded === component} onclick={() => expandComponent(component)}>
-          <span>{component}</span><span class="muted">{component === 'Fabric API' ? options.api.find(a => a.id === fabricApi)?.version_number ?? t("不安装") : loaderKind === kind && loader ? loader : t("不安装")}</span><span class:expanded={expanded === component}><Icon name="chevron" size={22} /></span>
+        <button id={'install-component-' + component} class="component-choice" disabled={optionsBusy || busy} aria-expanded={expanded === component} onclick={() => expandComponent(component)}>
+          <span>{componentNames[component]}</span><span class="muted">{component === 'fabricApi' ? options.api.find(a => a.id === fabricApi)?.version_number ?? t("不安装") : loader || t("不安装")}</span><span class:expanded={expanded === component}><Icon name="chevron" size={22} /></span>
         </button>
         {#if expanded === component}
           <div class="component-options">
-            <button class="full-width" disabled={busy} onclick={() => { if (component === 'Fabric API') fabricApi = ''; else if (loaderKind === kind) { loader = ''; fabricApi = ''; } expanded = ''; }}>{t("不安装")}</button>
+            <button class="full-width" disabled={busy} onclick={() => { if (component === 'fabricApi') { fabricApi = ''; expanded = ''; } else void chooseLoader(kind, ''); }}>{t("不安装")}</button>
             {#if optionsBusy}<p class="caption" role="status">{t("正在查询兼容组件…")}</p>
             {:else if optionsError}<p class="issue" role="alert">{optionsError}</p><button class="text-button" onclick={() => { expanded = ''; void expandComponent(component); }}>{t("重试")}</button>
-            {:else if component === 'Fabric API'}
-              {#each options.api as item}<button class="full-width" disabled={busy || !loader || loaderKind !== 'fabric'} onclick={() => { fabricApi = item.id; expanded = ''; }}>{item.version_number}{item.version_type === 'release' ? t(" · 正式版") : ''}</button>{/each}
-              {#if !loader || loaderKind !== 'fabric'}<p class="caption">{t("请先选择 Fabric Loader。")}</p>{:else if !options.api.length}<p class="caption">{t("此版本暂无兼容的 Fabric API。")}</p>{/if}
+            {:else if component === 'fabricApi'}
+              {#each options.api as item}<button class="full-width" disabled={busy} onclick={() => { fabricApi = item.id; expanded = ''; }}>{item.version_number}{item.version_type === 'release' ? t(" · 正式版") : ''}</button>{/each}
+              {#if !options.api.length}<p class="caption">{t("此版本暂无兼容的 Fabric API。")}</p>{/if}
             {:else}
               {#each choices as item}<button class="full-width" disabled={busy} onclick={() => chooseLoader(kind, item.id)}>{item.id}{item.stable ? t(" · 稳定版") : ''}</button>{/each}
-              {#if !choices.length}<p class="caption">{t("此 Minecraft 版本暂无兼容的")} {component}。</p>{/if}
+              {#if !choices.length}<p class="caption">{t("此 Minecraft 版本暂无兼容的")} {componentNames[component]}。</p>{/if}
             {/if}
           </div>
         {/if}

@@ -52,7 +52,10 @@ impl Default for Settings {
             offline_player_name: "Player".into(),
             account_mode: "microsoft".into(),
             microsoft_client_id: std::env::var("HYDROGEN_MICROSOFT_CLIENT_ID")
-                .unwrap_or_else(|_| "9a5a637c-bca3-44d2-984c-cb49aac9f5b7".into()),
+                .ok()
+                .filter(|value| !value.trim().is_empty())
+                .or_else(|| option_env!("HYDROGEN_MICROSOFT_CLIENT_ID").map(str::to_owned))
+                .unwrap_or_default(),
             modules: BTreeMap::new(),
         }
     }
@@ -99,6 +102,8 @@ pub struct Instance {
     pub repository_root: Option<String>,
     #[serde(default)]
     pub loader_name: String,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub isolated: bool,
 }
 pub fn id_valid(id: &str) -> bool {
     id.len() == 32 && id.bytes().all(|c| c.is_ascii_hexdigit())

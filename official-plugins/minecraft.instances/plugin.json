@@ -3,6 +3,7 @@
   "apiVersion": 1,
   "id": "minecraft.instances",
   "name": "游戏实例",
+  "description": "识别本地游戏版本，管理实例名称、目录和独立设置，并支持迁移旧版启动器数据。",
   "version": "1.0.0",
   "runtime": "native",
   "entry": "bin/plugin.dll",

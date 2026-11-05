@@ -3,6 +3,7 @@
   "apiVersion": 1,
   "id": "minecraft.install",
   "name": "游戏安装",
+  "description": "创建并安装所选 Minecraft 版本，配置模组加载器，也可修复已有实例。",
   "version": "1.0.0",
   "runtime": "native",
   "entry": "bin/plugin.dll",

@@ -1,4 +1,13 @@
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
+import './fonts.css';
+
+document.addEventListener('contextmenu', event => {
+ const target = event.target;
+ if (target instanceof HTMLInputElement && ['text', 'search', 'number', 'password', 'email', 'url', 'tel'].includes(target.type)) return;
+ if (target instanceof HTMLTextAreaElement || (target instanceof HTMLElement && target.isContentEditable)) return;
+ event.preventDefault();
+});
+
 type Frontend = { id: string; digest:string; entry: string; styles: string[] };
 async function start() {
  const frontends = await invoke<Frontend[]>('ui_bootstrap', { provider: 'ui.shell' });

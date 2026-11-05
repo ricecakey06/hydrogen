@@ -46,7 +46,10 @@ impl Default for Settings {
             offline_player_name: "Player".into(),
             account_mode: "microsoft".into(),
             microsoft_client_id: std::env::var("HYDROGEN_MICROSOFT_CLIENT_ID")
-                .unwrap_or_else(|_| "9a5a637c-bca3-44d2-984c-cb49aac9f5b7".into()),
+                .ok()
+                .filter(|value| !value.trim().is_empty())
+                .or_else(|| option_env!("HYDROGEN_MICROSOFT_CLIENT_ID").map(str::to_owned))
+                .unwrap_or_default(),
             modules: BTreeMap::new(),
         }
     }

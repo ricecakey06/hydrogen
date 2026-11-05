@@ -24,13 +24,19 @@ async fn install(mut state: Value, mut instance: Value, job: Arc<Job>) -> Result
     let version = text(&instance, "gameVersion")?.to_owned();
     let directory = text(&instance, "directoryName")?.to_owned();
     job.phase("resolving", "正在解析游戏文件…");
-    let existing = !invoke(
+    let manifest = invoke(
         "minecraft.instances",
         "minecraft.instances",
         "manifestFile",
         json!({"root":game_root,"name":directory}),
-    )?
-    .is_null();
+    )?;
+    // Pack overrides may contain top-level JSON files. Only the manifest
+    // published by the installer can be reused for a pack instance.
+    let existing = if instance["isolated"] == true {
+        manifest == format!("versions/{directory}/{directory}.json")
+    } else {
+        !manifest.is_null()
+    };
     let mut metadata = if existing {
         invoke(
             "minecraft.instances",
@@ -136,8 +142,9 @@ impl State {
                 let version = text(p, "version")?.to_owned();
                 let name = text(p, "name")?.to_owned();
                 let components = p["components"].clone();
+                let pack_stage = p["packStage"].clone();
                 let job = Arc::new(Job::default());
-                self.jobs.begin(job.clone(),async move{let versions=service_task("minecraft.content","versions",json!({"root":state["root"],"settings":state["settings"]}),&job).await?;if !versions.as_array().is_some_and(|v|v.iter().any(|v|v["id"]==version)){return Err(ApiError::new("UNKNOWN_VERSION","官方目录中没有此游戏版本。"));}invoke("minecraft.instances","minecraft.instances","records.create",json!({"state":state,"version":version,"name":name,"components":components}))})
+                self.jobs.begin(job.clone(),async move{let versions=service_task("minecraft.content","versions",json!({"root":state["root"],"settings":state["settings"]}),&job).await?;if !versions.as_array().is_some_and(|v|v.iter().any(|v|v["id"]==version)){return Err(ApiError::new("UNKNOWN_VERSION","官方目录中没有此游戏版本。"));}invoke("minecraft.instances","minecraft.instances","records.create",json!({"state":state,"version":version,"name":name,"components":components,"packStage":pack_stage}))})
             }
             _ => Err(ApiError::new("UNKNOWN_METHOD", "未知安装方法。")),
         }

@@ -3,6 +3,7 @@
   "apiVersion": 1,
   "id": "minecraft.files",
   "name": "minecraft.files",
+  "description": "按哈希校验本地游戏文件，复用完整文件并下载缺失或损坏的文件。",
   "version": "1.0.0",
   "runtime": "native",
   "entry": "bin/plugin.dll",

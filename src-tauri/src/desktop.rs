@@ -18,6 +18,8 @@ use std::{
 };
 use tauri::{Emitter, Manager, State, WebviewWindow};
 
+mod about;
+
 struct PendingPlugin {
     created: Instant,
     candidate: crate::plugins::manager::Candidate,
@@ -161,6 +163,11 @@ fn instance_select(window: WebviewWindow, state: State<'_, AppState>, id: String
     deny_unknown_fields
 )]
 enum LauncherAction {
+    CheckLauncherUpdate,
+    AboutLicenses,
+    OpenAboutLink {
+        link: crate::launcher::environment::AboutLink,
+    },
     PluginPreview,
     PluginInstall {
         token: String,
@@ -180,11 +187,27 @@ enum LauncherAction {
     ImportLegacyCommit {
         token: String,
     },
+    ModpackImport,
+    ModpackDirectories {
+        id: String,
+    },
+    ModpackExport {
+        id: String,
+        options: serde_json::Value,
+    },
     OpenMods {
         id: String,
     },
     ModsList {
         id: String,
+    },
+    ModUpdates {
+        id: String,
+        hashes: Vec<String>,
+    },
+    ModsUpdate {
+        id: String,
+        files: Vec<crate::launcher::mods::ModRef>,
     },
     ModsImport {
         id: String,
@@ -207,6 +230,34 @@ enum LauncherAction {
         id: String,
         file: crate::launcher::mods::ModRef,
         name: String,
+    },
+    ResourceFilters {
+        source: Option<String>,
+    },
+    ResourceSearch {
+        query: String,
+        game_version: String,
+        category: String,
+        #[serde(default)]
+        loader: String,
+        offset: u64,
+        source: Option<String>,
+    },
+    ResourceVersions {
+        id: String,
+        project: String,
+        source: Option<String>,
+    },
+    ResourceDependencies {
+        project: String,
+        version_id: Option<String>,
+        source: Option<String>,
+    },
+    ResourceDownload {
+        id: String,
+        project: String,
+        version_id: String,
+        source: Option<String>,
     },
     SaveSettings {
         settings: crate::launcher::storage::Settings,
@@ -301,9 +352,36 @@ async fn launcher_action(
 ) -> Result<serde_json::Value> {
     main_document(&window)?;
     // ponytail: one command gate prevents task-start / provider-update races; use provider leases when tasks expose their dependency scopes.
-    let _guard = state.plugin_mutation.lock().await;
+    let _guard = if matches!(
+        &action,
+        LauncherAction::ResourceFilters { .. }
+            | LauncherAction::ResourceSearch { .. }
+            | LauncherAction::ResourceVersions { .. }
+            | LauncherAction::ResourceDependencies { .. }
+            | LauncherAction::ModUpdates { .. }
+            | LauncherAction::CheckLauncherUpdate
+            | LauncherAction::AboutLicenses
+    ) {
+        None
+    } else {
+        Some(state.plugin_mutation.lock().await)
+    };
     let core = state.core.clone();
     let value = match action {
+        LauncherAction::CheckLauncherUpdate => {
+            serde_json::to_value(about::check_update(&core.client).await?)?
+        }
+        LauncherAction::AboutLicenses => {
+            serde_json::Value::from(include_str!("../../licenses/third-party.json"))
+        }
+        LauncherAction::OpenAboutLink { link } => {
+            crate::launcher::environment::open_about_link(
+                &core.plugins,
+                &core.lease().settings,
+                link,
+            )?;
+            serde_json::Value::Null
+        }
         LauncherAction::PluginPreview => {
             if let Some(path) = choose(&window, &core, false, false)
                 .await?
@@ -521,6 +599,19 @@ async fn launcher_action(
                 serde_json::Value::Null
             }
         }
+        LauncherAction::ModpackImport => {
+            let Some(path) = choose(&window, &core, false, false).await?.into_iter().next() else {
+                return Ok(serde_json::Value::Null);
+            };
+            serde_json::json!(core.import_modpack(path).await?)
+        }
+        LauncherAction::ModpackDirectories { id } => core.modpack_directories(&id).await?,
+        LauncherAction::ModpackExport { id, options } => {
+            let Some(path) = choose(&window, &core, true, false).await?.into_iter().next() else {
+                return Ok(serde_json::Value::Null);
+            };
+            serde_json::json!(core.export_modpack(&id, path, options)?)
+        }
         LauncherAction::ImportLegacyCommit { token } => {
             let (created, plan) = state
                 .legacy_imports
@@ -548,6 +639,8 @@ async fn launcher_action(
             serde_json::Value::Null
         }
         LauncherAction::ModsList { id } => serde_json::to_value(core.mods(&id).await?)?,
+        LauncherAction::ModUpdates { id, hashes } => core.mod_updates(&id, hashes).await?,
+        LauncherAction::ModsUpdate { id, files } => serde_json::to_value(core.update_mods(id, files)?)?,
         LauncherAction::ModsImport { id } => {
             let files = choose(&window, &core, false, true).await?;
             if files.is_empty() {
@@ -588,6 +681,23 @@ async fn launcher_action(
         LauncherAction::ModsName { id, file, name } => {
             core.name_mod(&id, file, &name).await?;
             serde_json::Value::Null
+        }
+        LauncherAction::ResourceFilters { source } => {
+            core.resource_catalog("filters", serde_json::json!({"source":source})).await?
+        }
+        LauncherAction::ResourceSearch { query, game_version, category, loader, offset, source } => {
+            core.resource_catalog("search", serde_json::json!({
+                "query": query, "gameVersion": game_version, "category": category, "loader": loader, "offset": offset, "source":source,
+            })).await?
+        }
+        LauncherAction::ResourceVersions { id, project, source } => core.resource_versions(&id, &project, source).await?,
+        LauncherAction::ResourceDependencies { project, version_id, source } => {
+            core.resource_catalog("dependencies", serde_json::json!({
+                "project": project, "versionId": version_id, "source":source,
+            })).await?
+        }
+        LauncherAction::ResourceDownload { id, project, version_id, source } => {
+            serde_json::to_value(core.download_mod(id, project, version_id, source)?)?
         }
         LauncherAction::SaveSettings { settings } => {
             let restore_account = {
@@ -1197,6 +1307,26 @@ pub fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
                     event
                 {
                     if paths.is_empty() || paths.len() > 1000 {
+                        return;
+                    }
+                    if let Some(path) = paths.iter().find(|path| {
+                        path.extension().is_some_and(|ext| {
+                            ext.eq_ignore_ascii_case("mrpack") || ext.eq_ignore_ascii_case("zip")
+                        })
+                    }) {
+                        if paths.len() != 1 {
+                            let error =
+                                ApiError::new("INVALID_MODPACK", "每次请拖入一个整合包文件。");
+                            let _ = drop_app.emit_to("main", "modpack-drop", Some(error));
+                            return;
+                        }
+                        let (app, path) = (drop_app.clone(), path.clone());
+                        tauri::async_runtime::spawn(async move {
+                            let state = app.state::<AppState>();
+                            let _guard = state.plugin_mutation.lock().await;
+                            let error = state.core.import_modpack(path).await.err();
+                            let _ = app.emit_to("main", "modpack-drop", error);
+                        });
                         return;
                     }
                     let state = drop_app.state::<AppState>();

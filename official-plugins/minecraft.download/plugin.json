@@ -3,6 +3,7 @@
   "apiVersion": 1,
   "id": "minecraft.download",
   "name": "minecraft.download",
+  "description": "按下载源设置传输游戏文件，报告进度并支持取消下载。",
   "version": "1.0.0",
   "runtime": "native",
   "entry": "bin/plugin.dll",

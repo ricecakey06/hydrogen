@@ -26,6 +26,10 @@ fn dispatch(_: &mut (), request: &mut Value) -> Result {
                 platform::browser(text("url")?)?;
                 Ok(Value::Null)
             }
+            "openAboutLink" => {
+                platform::open_about_link(text("link")?)?;
+                Ok(Value::Null)
+            }
             "openFolder" => {
                 platform::open_folder(Path::new(text("path")?))?;
                 Ok(Value::Null)

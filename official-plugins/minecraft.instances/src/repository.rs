@@ -500,7 +500,12 @@ pub fn publish(
                     .unwrap_or_default()
             );
         }
-        patches.push(json!({"id":"fabric", "version":loader,"priority":30000,"mainClass":complete["mainClass"],"arguments":arguments,"libraries":libraries}));
+        let id = if loader_kind == "quilt" {
+            "quilt"
+        } else {
+            "fabric"
+        };
+        patches.push(json!({"id":id, "version":loader,"priority":30000,"mainClass":complete["mainClass"],"arguments":arguments,"libraries":libraries}));
     }
     let mut manifest = clean(complete);
     manifest["id"] = name.into();

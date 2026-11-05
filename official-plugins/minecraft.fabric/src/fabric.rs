@@ -10,6 +10,8 @@ use std::path::{Path, PathBuf};
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Components {
+    #[serde(default)]
+    pub kind: String,
     pub loader: String,
     pub fabric_api: Option<String>,
 }
@@ -76,12 +78,19 @@ pub async fn fabric(
     {
         return Err(invalid());
     }
-    job.begin_download([("正在解析 Fabric".into(), None)], false);
-    job.file_started("正在解析 Fabric");
-    let relative = format!("cache/fabric-{version}-{}.json", components.loader);
+    let (kind, name, endpoint) = if components.kind == "quilt" {
+        ("quilt", "Quilt", "https://meta.quiltmc.org/v3")
+    } else {
+        ("fabric", "Fabric", "https://meta.fabricmc.net/v2")
+    };
+    let message = format!("正在解析 {name}");
+    job.begin_download([(message.clone(), None)], false);
+    job.file_started(&message);
+    let profile_id = format!("{kind}-loader-{}-{version}", components.loader);
+    let relative = format!("cache/{kind}-{version}-{}.json", components.loader);
     let profile_path = storage::within(data_root, &relative)?;
     let legacy_path = storage::within(game, ".hydrogen/fabric.json")?;
-    let legacy: Value = if legacy_path.exists() {
+    let legacy: Value = if kind == "fabric" && legacy_path.exists() {
         storage::read_json(&legacy_path)?
     } else {
         Value::Null
@@ -90,7 +99,7 @@ pub async fn fabric(
         storage::read_json(&profile_path)?
     } else if legacy["schemaVersion"] == 1
         && legacy["gameVersion"] == version
-        && legacy["profile"]["id"] == format!("fabric-loader-{}-{version}", components.loader)
+        && legacy["profile"]["id"] == profile_id
     {
         storage::write_json(&profile_path, &legacy["profile"])?;
         legacy["profile"].clone()
@@ -98,13 +107,13 @@ pub async fn fabric(
         if !settings.enabled("minecraft.download") {
             return Err(ApiError::new(
                 "DOWNLOADS_DISABLED",
-                "缺少已缓存的 Fabric 启动配置。",
+                format!("缺少已缓存的 {name} 启动配置。"),
             ));
         }
         let profile = net::json(
             client,
             &format!(
-                "https://meta.fabricmc.net/v2/versions/loader/{version}/{}/profile/json",
+                "{endpoint}/versions/loader/{version}/{}/profile/json",
                 components.loader
             ),
         )
@@ -112,12 +121,10 @@ pub async fn fabric(
         storage::write_json(&profile_path, &profile)?;
         profile
     };
-    if profile["id"] != format!("fabric-loader-{}-{version}", components.loader)
-        || profile["inheritsFrom"] != version
-    {
+    if profile["id"] != profile_id || profile["inheritsFrom"] != version {
         return Err(ApiError::new(
             "FABRIC_PROFILE_MISMATCH",
-            "Fabric 启动配置与此实例不匹配。",
+            format!("{name} 启动配置与此实例不匹配。"),
         ));
     }
     let mut extra = Vec::new();
@@ -169,7 +176,7 @@ pub async fn fabric(
             if !settings.enabled("minecraft.download") {
                 return Err(ApiError::new(
                     "DOWNLOADS_DISABLED",
-                    "Fabric 依赖缺少缓存校验信息。",
+                    format!("{name} 依赖缺少缓存校验信息。"),
                 ));
             }
             let bytes = net::bytes(client, &format!("{url}.sha1"), 1024).await?;
