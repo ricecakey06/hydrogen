@@ -42,6 +42,8 @@ pub struct Prepared {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Settings {
+    #[serde(default = "default_locale")]
+    pub locale: String,
     #[serde(default)]
     pub game_directory: Option<String>,
     #[serde(default)]
@@ -60,6 +62,9 @@ pub struct Settings {
     pub account_mode: String,
     pub microsoft_client_id: String,
     pub modules: BTreeMap<String, bool>,
+}
+fn default_locale() -> String {
+    "zh-CN".into()
 }
 fn allows(
     client: &Client,

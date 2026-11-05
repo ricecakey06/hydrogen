@@ -13,23 +13,23 @@ const MANIFEST: &str = "https://piston-meta.mojang.com/mc/game/version_manifest_
 pub struct Version {
     pub id: String,
     pub release_time: String,
+    pub version_type: String,
 }
 fn invalid() -> ApiError {
     ApiError::new("INVALID_METADATA", "游戏元数据不完整或格式尚未支持。")
 }
 pub fn supported(id: &str) -> bool {
-    let parts: Vec<_> = id.split('.').collect();
-    if !(2..=3).contains(&parts.len())
-        || parts
-            .iter()
-            .any(|p| p.is_empty() || !p.bytes().all(|c| c.is_ascii_digit()))
-    {
-        return false;
-    }
-    let major = parts[0].parse::<u32>().unwrap_or(0);
-    let minor = parts[1].parse::<u32>().unwrap_or(0);
-    major == 1 && minor >= 18 || major >= 26
+    // The official catalog is the authority; snapshots also have non-numeric IDs.
+    !id.trim().is_empty()
+        && id.chars().count() <= 100
+        && id != "."
+        && id != ".."
+        && !id.ends_with(['.', ' '])
+        && !id
+            .chars()
+            .any(|c| c.is_control() || "<>:\"/\\|?*".contains(c))
 }
+
 pub async fn catalog(client: &net::Client, root: &Path, settings: &Settings) -> Result<Value> {
     use std::{
         sync::OnceLock,
@@ -55,8 +55,14 @@ pub async fn catalog(client: &net::Client, root: &Path, settings: &Settings) -> 
                 let result = async {
                     let url =
                         net::source_url(client, MANIFEST, settings.download_source == "bmclapi")?;
-                    let value: Value =
-                        serde_json::from_slice(&net::bytes(client, &url, 16 * 1024 * 1024).await?)?;
+                    let bytes = match net::bytes(client, &url, 16 * 1024 * 1024).await {
+                        Ok(bytes) => bytes,
+                        Err(_) if url != MANIFEST => {
+                            net::bytes(client, MANIFEST, 16 * 1024 * 1024).await?
+                        }
+                        Err(error) => return Err(error),
+                    };
+                    let value: Value = serde_json::from_slice(&bytes)?;
                     if !value["versions"]
                         .as_array()
                         .is_some_and(|versions| !versions.is_empty())
@@ -115,10 +121,14 @@ pub async fn versions(
         .as_array()
         .ok_or_else(invalid)?
         .iter()
-        .filter(|v| v["type"] == "release" && v["id"].as_str().is_some_and(supported))
+        .filter(|v| {
+            matches!(v["type"].as_str(), Some("release" | "snapshot"))
+                && v["id"].as_str().is_some_and(supported)
+        })
         .map(|v| Version {
             id: v["id"].as_str().unwrap().into(),
             release_time: v["releaseTime"].as_str().unwrap_or("").into(),
+            version_type: v["type"].as_str().unwrap_or("release").into(),
         })
         .collect())
 }
@@ -131,17 +141,14 @@ pub async fn resolve(
     job: &Job,
 ) -> Result<Value> {
     if !supported(id) {
-        return Err(ApiError::new(
-            "UNSUPPORTED_VERSION",
-            "支持范围为 1.18 起的官方正式版。",
-        ));
+        return Err(ApiError::new("UNSUPPORTED_VERSION", "游戏版本标识无效。"));
     }
     let catalog = catalog(client, data_root, settings).await?;
     let entry = catalog["versions"]
         .as_array()
         .ok_or_else(invalid)?
         .iter()
-        .find(|v| v["id"] == id && v["type"] == "release")
+        .find(|v| v["id"] == id && matches!(v["type"].as_str(), Some("release" | "snapshot")))
         .ok_or_else(invalid)?;
     let hash = text(entry, "sha1")?;
     let local = storage::within(game_root, &format!("versions/{id}/{id}.json"))?;
@@ -161,16 +168,22 @@ pub async fn resolve(
         )
         .await?
     };
-    let metadata: Value = storage::read_json(&path)?;
+    let mut metadata: Value = storage::read_json(&path)?;
     if metadata["id"] != id
-        || !metadata["arguments"].is_object()
-        || metadata["javaVersion"]["majorVersion"].as_u64().is_none()
+        || !metadata["mainClass"].is_string()
+        || !(metadata["arguments"].is_object() || metadata["minecraftArguments"].is_string())
         || metadata["minimumLauncherVersion"]
             .as_u64()
             .is_some_and(|n| n > 21)
     {
         return Err(invalid());
     }
+    metadata = hydrogen_plugin_services::invoke(
+        "minecraft.instances",
+        "minecraft.instances",
+        "normalize",
+        serde_json::json!({"metadata": metadata, "gameVersion": id}),
+    )?;
     Ok(metadata)
 }
 pub fn allows(owner: &Value, architecture: &str, custom_resolution: bool) -> Result<bool> {

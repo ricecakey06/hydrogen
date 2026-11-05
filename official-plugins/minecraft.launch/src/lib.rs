@@ -40,7 +40,8 @@ async fn launch(p: Value, job: Arc<Job>) -> Result<Value> {
         json!({"settings":p["settings"],"overrides":instance["overrides"]}),
     )?;
     let settings: Settings = serde_json::from_value(raw.clone())?;
-    let client = Client::new(&PluginHost, &serde_json::from_value(raw.clone())?)?;
+    let network_settings = serde_json::from_value(raw.clone())?;
+    let client = Client::new(&PluginHost, &network_settings)?;
     job.phase("checking", "正在检查账号与 Java…");
     let session: Session = serde_json::from_value(
         service_task(
@@ -146,6 +147,16 @@ async fn launch(p: Value, job: Arc<Job>) -> Result<Value> {
         java.architecture,
         settings.max_memory_mib
     ));
+    if PluginHost.available(&network_settings, "i18n")
+        && let Err(error) = invoke(
+            "i18n",
+            "i18n",
+            "applyGameLanguage",
+            json!({"root":root,"directory":game,"locale":settings.locale,"version":instance["gameVersion"]}),
+        )
+    {
+        log.line(&format!("Game language: {}", error.message));
+    }
     job.phase("starting", "正在启动游戏…");
     job.check()?;
     let started_at = std::time::SystemTime::now()

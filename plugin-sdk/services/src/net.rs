@@ -55,7 +55,19 @@ pub async fn bytes(client: &Client, url: &str, limit: usize) -> Result<Vec<u8>> 
             "下载地址不属于支持的内容服务。",
         ));
     }
-    response_bytes(client.get(url).send().await.map_err(network_error)?, limit).await
+    for attempt in 0..3 {
+        let result = async {
+            response_bytes(client.get(&url).send().await.map_err(network_error)?, limit).await
+        }
+        .await;
+        match result {
+            Err(error) if error.retryable && attempt < 2 => {
+                tokio::time::sleep(std::time::Duration::from_millis(300 * (attempt + 1))).await;
+            }
+            result => return result,
+        }
+    }
+    unreachable!()
 }
 pub async fn response_bytes(mut response: Response, limit: usize) -> Result<Vec<u8>> {
     if !response.status().is_success() {

@@ -20,6 +20,8 @@ pub struct Overrides {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Components {
+    #[serde(default)]
+    pub kind: String,
     pub loader: String,
     pub fabric_api: Option<String>,
 }
@@ -93,6 +95,7 @@ impl Store {
             overrides: Overrides::default(),
             components: if version.loader == "Fabric" {
                 version.loader_version.as_ref().map(|loader| Components {
+                    kind: String::new(),
                     loader: loader.clone(),
                     fabric_api: None,
                 })
@@ -208,12 +211,25 @@ impl Store {
         components: Option<Components>,
     ) -> Result<Instance> {
         self.writable()?;
-        if version.len() > 100
-            || !version
-                .bytes()
-                .all(|c| c.is_ascii_alphanumeric() || b"._-".contains(&c))
-        {
+        if version.chars().count() > 100 || !repository::valid_name(version) {
             return Err(ApiError::new("INVALID_VERSION", "游戏版本无效。"));
+        }
+        if let Some(component) = &components
+            && (!["", "fabric", "forge", "neoforge"].contains(&component.kind.as_str())
+                || component.loader.is_empty()
+                || component.loader.len() > 100
+                || !component
+                    .loader
+                    .bytes()
+                    .all(|c| c.is_ascii_alphanumeric() || b"._+-".contains(&c))
+                || (!component.kind.is_empty()
+                    && component.kind != "fabric"
+                    && component.fabric_api.is_some()))
+        {
+            return Err(ApiError::new(
+                "INVALID_COMPONENTS",
+                "组件类型或版本无效，Fabric API 只能与 Fabric 一起安装。",
+            ));
         }
         let name = validate_name(if name.trim().is_empty() {
             version
@@ -251,11 +267,17 @@ impl Store {
             components: components.clone(),
             directory_name: Some(name.clone()),
             repository_root: Some(self.game_root.to_string_lossy().into()),
-            loader_name: if components.is_some() {
-                "Fabric".into()
-            } else {
-                String::new()
-            },
+            loader_name: components
+                .as_ref()
+                .map(|c| {
+                    match c.kind.as_str() {
+                        "forge" => "Forge",
+                        "neoforge" => "NeoForge",
+                        _ => "Fabric",
+                    }
+                    .into()
+                })
+                .unwrap_or_default(),
         };
         self.write_instance(&instance)?;
         fs::create_dir_all(self.version_dir(&instance.info.id)?)?;

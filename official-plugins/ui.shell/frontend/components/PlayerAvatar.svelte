@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../lib/i18n';
   import Icon from './Icon.svelte';
   import { skinHead } from '../lib/avatar';
 
@@ -19,4 +20,4 @@
   });
 </script>
 
-{#if face}<img src={face} alt="玩家头像" width={size} height={size} />{:else}<Icon name="user" size={iconSize} width={iconWidth} />{/if}
+{#if face}<img src={face} alt={t("玩家头像")} width={size} height={size} />{:else}<Icon name="user" size={iconSize} width={iconWidth} />{/if}

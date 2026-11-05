@@ -434,6 +434,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "hydrogen-i18n"
+version = "1.0.0"
+dependencies = [
+ "hydrogen-plugin-sdk",
+ "hydrogen-plugin-services",
+ "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "hydrogen-java-runtime"
 version = "1.0.0"
 dependencies = [
@@ -509,6 +521,21 @@ dependencies = [
  "sha1",
  "tokio",
  "uuid",
+]
+
+[[package]]
+name = "hydrogen-minecraft-forge"
+version = "1.0.0"
+dependencies = [
+ "base64",
+ "hydrogen-plugin-sdk",
+ "hydrogen-plugin-services",
+ "regex",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "uuid",
+ "zip",
 ]
 
 [[package]]

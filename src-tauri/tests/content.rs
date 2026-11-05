@@ -7,10 +7,21 @@ async fn metadata_rules_and_network_boundaries() {
     let root = tempfile::tempdir().unwrap();
     let host = common::plugin_host(root.path());
     let client = net::client(&host, &hydrogen::launcher::storage::Settings::default()).unwrap();
-    for id in ["1.18", "1.21.1", "26.1"] {
+    for id in [
+        "1.0",
+        "1.7.10",
+        "1.12.2",
+        "1.17.1",
+        "1.18",
+        "1.21.1",
+        "26.1",
+        "24w14a",
+        "1.18-pre1",
+        "1.18-rc1",
+    ] {
         assert!(minecraft::supported(&client, id).unwrap());
     }
-    for id in ["1.17.1", "../1.21.1", "1.21-snapshot", "1.21.1.4", "1..2"] {
+    for id in ["../1.21.1", "", "..", "a/b", "a\\b"] {
         assert!(!minecraft::supported(&client, id).unwrap());
     }
     assert!(

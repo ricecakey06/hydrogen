@@ -46,6 +46,11 @@
     {
       "id": "diagnostics",
       "version": "^1"
+    },
+    {
+      "id": "i18n",
+      "version": "^1",
+      "optional": true
     }
   ],
   "provides": [

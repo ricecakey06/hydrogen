@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../lib/i18n';
   import { onMount } from 'svelte';
   import { invoke, errorMessage, type PanelSession } from '../lib/api';
   import Icon from './Icon.svelte';
@@ -19,7 +20,7 @@
   }
   function loaded() {
     if (!session || disposed) return;
-    if (++loads > 1) { revoke(); onerror('面板发生导航，会话已撤销。请重新打开。'); return; }
+    if (++loads > 1) { revoke(); onerror(t("面板发生导航，会话已撤销。请重新打开。")); return; }
     frame?.contentWindow?.postMessage({ type: 'hydrogen:hello', nonce: session.nonce }, '*');
   }
   function handshake(event: MessageEvent) {
@@ -60,9 +61,9 @@
 
 <div bind:this={container}>
 {#if session}
-  <iframe bind:this={frame} src={session.url} sandbox="allow-scripts" title="插件自定义面板" onload={loaded}></iframe>
+  <iframe bind:this={frame} src={session.url} sandbox="allow-scripts" title={t("插件自定义面板")} onload={loaded}></iframe>
 {:else}
-  <p class="operation-status" role="status"><span class="spinner"><Icon name="spinner" size={18} /></span>正在打开隔离面板…</p>
+  <p class="operation-status" role="status"><span class="spinner"><Icon name="spinner" size={18} /></span>{t("正在打开隔离面板…")}</p>
 {/if}
 </div>
 

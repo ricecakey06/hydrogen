@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 1,
+  "id": "i18n",
+  "name": "多语言支持",
+  "description": "启动器语言包与游戏默认语言。",
+  "version": "1.0.0",
+  "runtime": "native",
+  "entry": "bin/plugin.dll",
+  "permissions": [
+    "native.code"
+  ],
+  "dependencies": [],
+  "provides": [
+    {
+      "id": "i18n",
+      "version": "1.0.0",
+      "methods": [
+        "bundle",
+        "languages",
+        "applyGameLanguage"
+      ]
+    }
+  ]
+}

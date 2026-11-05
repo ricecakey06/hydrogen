@@ -38,6 +38,7 @@ pub fn trusted(url: &Url) -> bool {
                 "cdn.jsdelivr.net",
                 "raw.githubusercontent.com",
                 "bmclapi2.bangbang93.com",
+                "mirror.nju.edu.cn",
                 "login.microsoftonline.com",
                 "user.auth.xboxlive.com",
                 "xsts.auth.xboxlive.com",
@@ -73,6 +74,9 @@ pub fn source_url(url: &str, mirror: bool) -> Result<String> {
         let prefix = match url.host_str().unwrap_or("") {
             "resources.download.minecraft.net" => Some("/assets"),
             "libraries.minecraft.net" => Some("/maven"),
+            "maven.minecraftforge.net" => Some("/maven"),
+            "files.minecraftforge.net" if url.path().starts_with("/maven/") => Some(""),
+            "files.minecraftforge.net" => Some("/maven"),
             "piston-meta.mojang.com"
             | "piston-data.mojang.com"
             | "launchermeta.mojang.com"
@@ -156,6 +160,64 @@ fn verification_error(code: &str, message: &str) -> ApiError {
     error.retryable = true;
     error
 }
+fn sources(url: &str, mirror: bool) -> Result<Vec<String>> {
+    let original = object_endpoint(url)?;
+    let mapped = object_endpoint(&source_url(url, true)?)?;
+    let mut mirrors = Vec::new();
+    if mapped != original {
+        mirrors.push(mapped);
+    }
+    // BMCLAPI can redirect Maven downloads to nodes outside the trusted host list.
+    // This fixed university mirror provides the same files without dynamic redirects.
+    let parsed = Url::parse(url).map_err(|_| ApiError::new("INVALID_URL", "下载地址无效。"))?;
+    let path = match parsed.host_str().unwrap_or("") {
+        "maven.minecraftforge.net" | "libraries.minecraft.net" => Some(parsed.path()),
+        "files.minecraftforge.net" => Some(
+            parsed
+                .path()
+                .strip_prefix("/maven")
+                .unwrap_or(parsed.path()),
+        ),
+        "bmclapi2.bangbang93.com" => parsed.path().strip_prefix("/maven"),
+        _ => None,
+    };
+    if let Some(path) = path.filter(|path| path.starts_with('/')) {
+        let mut university = parsed.clone();
+        university
+            .set_host(Some("mirror.nju.edu.cn"))
+            .map_err(|_| ApiError::new("INVALID_URL", "镜像地址无效。"))?;
+        university.set_path(&format!("/bmclapi{path}"));
+        mirrors.push(university.to_string());
+    }
+    let mut urls = if mirror {
+        mirrors.push(original);
+        mirrors
+    } else {
+        let mut urls = vec![original];
+        urls.extend(mirrors);
+        urls
+    };
+    urls.dedup();
+    Ok(urls)
+}
+fn source_failure(error: &ApiError) -> bool {
+    error.code != "CANCELLED"
+        && (error.retryable
+            || matches!(
+                error.code.as_str(),
+                "NETWORK"
+                    | "DOWNLOAD_HTTP_301"
+                    | "DOWNLOAD_HTTP_302"
+                    | "DOWNLOAD_HTTP_303"
+                    | "DOWNLOAD_HTTP_307"
+                    | "DOWNLOAD_HTTP_308"
+                    | "DOWNLOAD_HTTP_401"
+                    | "DOWNLOAD_HTTP_403"
+                    | "DOWNLOAD_HTTP_404"
+                    | "DOWNLOAD_HTTP_410"
+                    | "DOWNLOAD_HTTP_429"
+            ))
+}
 #[allow(clippy::too_many_arguments)]
 pub async fn ensure_game_file(
     client: &Client,
@@ -190,14 +252,7 @@ pub async fn ensure_game_file(
     let _guard = tokio::select! { _=job.cancel.cancelled()=>return Err(ApiError::new("CANCELLED","下载已取消。")), guard=lock.lock()=>guard };
     job.check()?;
     job.file_started(relative);
-    let source = source_url(url, mirror)?;
-    let original = object_endpoint(url)?;
-    let mapped = object_endpoint(&source)?;
-    let sources = if mapped != original {
-        vec![mapped, original]
-    } else {
-        vec![original]
-    };
+    let sources = sources(url, mirror)?;
     let mut last_error = ApiError::new("DOWNLOAD_FAILED", "下载失败。");
     for (source_index, source) in sources.iter().enumerate() {
         for attempt in 0..3 {
@@ -217,12 +272,10 @@ pub async fn ensure_game_file(
                 }
             }
         }
-        let fallback = last_error.code == "NETWORK"
-            || matches!(
-                last_error.code.as_str(),
-                "DOWNLOAD_HTTP_404" | "DOWNLOAD_HTTP_410" | "DOWNLOAD_HTTP_429"
-            );
-        if source_index + 1 >= sources.len() || !fallback || job.cancel.is_cancelled() {
+        if source_index + 1 >= sources.len()
+            || !source_failure(&last_error)
+            || job.cancel.is_cancelled()
+        {
             break;
         }
     }
@@ -317,8 +370,20 @@ impl Transfer<'_> {
         Ok((response, permit))
     }
     async fn download(&self, path: &Path) -> Result<()> {
-        if self.size.is_some_and(|size| size >= 8 * 1024 * 1024) && self.segments(path).await? {
-            return Ok(());
+        if self.size.is_some_and(|size| size >= 8 * 1024 * 1024) {
+            match self.segments(path).await {
+                Ok(true) => return Ok(()),
+                Ok(false) => {}
+                Err(error) if source_failure(&error) => {
+                    self.job.check()?;
+                    match tokio::fs::remove_file(path).await {
+                        Ok(()) => {}
+                        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                        Err(error) => return Err(error.into()),
+                    }
+                }
+                Err(error) => return Err(error),
+            }
         }
         self.job.file_progress(self.relative, 0, false);
         let (mut response, _connection) = self.send(self.url, None).await?;
@@ -422,4 +487,44 @@ fn validate_range(response: &Response, start: u64, end: u64, size: u64) -> Resul
 
 fn network_error(error: ApiError) -> ApiError {
     error
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn forge_sources_keep_official_urls_and_recover_from_mirror_failures() {
+        let path = "/net/minecraftforge/forge/1.20.1-47.4.0/forge-1.20.1-47.4.0-installer.jar";
+        let official = format!("https://maven.minecraftforge.net{path}");
+        let bmcl = format!("https://bmclapi2.bangbang93.com/maven{path}");
+        let university = format!("https://mirror.nju.edu.cn/bmclapi{path}");
+        assert_eq!(
+            sources(&official, false).unwrap(),
+            [official.clone(), bmcl.clone(), university.clone()]
+        );
+        assert_eq!(
+            sources(&official, true).unwrap(),
+            [bmcl.clone(), university.clone(), official]
+        );
+        assert_eq!(sources(&bmcl, true).unwrap(), [university, bmcl]);
+        assert!(sources("https://untrusted.invalid/file", true).is_err());
+        for code in [
+            "DOWNLOAD_HTTP_302",
+            "DOWNLOAD_HTTP_403",
+            "DOWNLOAD_HTTP_429",
+        ] {
+            assert!(source_failure(&ApiError::new(code, "fixture")));
+        }
+        for code in [
+            "NETWORK",
+            "DOWNLOAD_HTTP_503",
+            "INVALID_RANGE",
+            "HASH_MISMATCH",
+        ] {
+            assert!(source_failure(&verification_error(code, "fixture")));
+        }
+        for code in ["CANCELLED", "IO_ERROR", "INVALID_HASH", "UNTRUSTED_URL"] {
+            assert!(!source_failure(&ApiError::new(code, "fixture")));
+        }
+    }
 }

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../../ui.shell/frontend/lib/i18n';
   import { action, errorMessage, taskActive, type Snapshot } from '../../../ui.shell/frontend/lib/api';
   import { downloadItem, downloadJobs, downloadSummary } from '../../../ui.shell/frontend/lib/downloads';
   import DownloadProgress from '../../../ui.shell/frontend/components/DownloadProgress.svelte';
@@ -23,17 +24,17 @@
       {@const version = task.gameVersion ?? instance?.gameVersion ?? ''}
       <section class="task-card">
         <div class="task-heading"><h2 title={name}>{name}</h2>
-          {#if taskActive(task)}<button class="text-button" disabled={task.phase === 'committing'} onclick={() => operate('cancelTask', { id: task.id })}>取消</button>
-          {:else if task.phase === 'failed'}<button onclick={() => task.instanceId && retry(task.instanceId)}>重试下载</button>{/if}
+          {#if taskActive(task)}<button class="text-button" disabled={task.phase === 'committing'} onclick={() => operate('cancelTask', { id: task.id })}>{t("取消")}</button>
+          {:else if task.phase === 'failed'}<button onclick={() => task.instanceId && retry(task.instanceId)}>{t("重试下载")}</button>{/if}
         </div>
         {#if name !== version}<p class="caption">{version}</p>{/if}
         <p class="download-status">{item.status}</p>
         <DownloadProgress percent={item.percent} indeterminate={item.indeterminate} />
         <p class="caption">{item.detail}</p>
-        {#if item.files.length}<p class="caption">正在处理的文件</p><div class="download-files">{#each item.files as file}<p>{file}</p>{/each}</div>{/if}
-        {#if task.phase === 'failed'}<p class="issue" role="alert">{task.message}</p>{/if}
+        {#if item.files.length}<p class="caption">{t("正在处理的文件")}</p><div class="download-files">{#each item.files as file}<p>{file}</p>{/each}</div>{/if}
+        {#if task.phase === 'failed'}<p class="issue" role="alert">{t(task.message)}</p>{/if}
       </section>
     {/each}
   </div>
-  <button class="full-width" title="下载会继续进行，可从主页右上角返回此页" onclick={onhome}>返回主页</button>
+  <button class="full-width" title={t("下载会继续进行，可从主页右上角返回此页")} onclick={onhome}>{t("返回主页")}</button>
 </div>

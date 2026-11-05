@@ -18,11 +18,9 @@ A simple interface · Everything is a plugin
 
 </div>
 
-Hydrogen organizes its interface, accounts, game instances and platform features into independent plugins. The host manages dependencies, permissions and lifetimes. The current version is **0.2.7**, targeting Windows x64 desktop distribution.
+Hydrogen organizes its interface, accounts, game instances and platform features into independent plugins. The host manages dependencies, permissions and lifetimes. The current version is **a0.2.7**.
 
-The Tauri version lives on the default [`tauri`](https://github.com/ricecakey06/hydrogen/tree/tauri) branch. The original .NET/Avalonia version is preserved on [`legacy`](https://github.com/ricecakey06/hydrogen/tree/legacy).
-
-The project is under development and primarily written with AI assistance. Long-term usability and stability still require ongoing validation.
+The project is under development and primarily written with AI. Long-term usability and stability still require ongoing validation.
 
 ## Features
 
@@ -49,11 +47,13 @@ Download `Launcher.exe` from [Releases](https://github.com/ricecakey06/hydrogen/
 
 1. Check Java, memory and the game directory in settings, or select an existing `.minecraft`.
 2. Add a Microsoft account or offline player in Profiles and select the profile to use. Offline profiles require the preinstalled Offline Launch plugin, which is enabled by default.
-3. Add a game version, choose vanilla or Fabric components, install it and select the instance to launch.
+3. Add a game version, choose vanilla, Fabric, Forge, or NeoForge components, install it and select the instance to launch.
 
-New installations support official Minecraft releases from 1.18 onward. Fabric and Fabric API versions can be selected explicitly, and failed or cancelled installations can be retried. Downloads and preparation continue after navigating away. Launching existing games validates and fills missing assets and dependencies.
+New installations support all official Minecraft releases (including versions below 1.18), snapshots, and pre-releases, with version search and type filters. Fabric, Forge, NeoForge, and Fabric API versions can be selected explicitly; choose one loader, and use Fabric API only with Fabric, and failed or cancelled installations can be retried. Downloads and preparation continue after navigating away. Launching existing games validates and fills missing assets and dependencies.
 
 The mods page shows local metadata and cached information. Click or drag to select mods and use the selection bar to enable, disable, delete or clear the selection. Import `.jar` / `.jar.disabled` files and edit local Chinese names. File modifications are restricted while the game or related tasks are active.
+
+Switch between English and Simplified Chinese under **Settings → General**. Saving also sets Minecraft's default language and preserves language choices made in the game. To add a custom language, use the [English pack](official-plugins/i18n/assets/locales/en-US.json) as a template, save it as `<locale>.json` in the launcher data directory under `language-packs`, and restart the launcher.
 
 After an abnormal game exit, the Crash Analysis plugin can show possible causes, log evidence and suggestions, and export a ZIP containing log snapshots. Common tokens and local paths are redacted; review content written by mods before sharing. Analysis depends on available logs and does not cover every crash.
 

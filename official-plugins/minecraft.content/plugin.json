@@ -29,6 +29,11 @@
       "id": "platform.windows.environment",
       "version": "^1",
       "optional": false
+    },
+    {
+      "id": "minecraft.instances",
+      "version": "^1",
+      "optional": false
     }
   ],
   "provides": [

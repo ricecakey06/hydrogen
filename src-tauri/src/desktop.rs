@@ -213,7 +213,14 @@ enum LauncherAction {
     },
     ChangeDataDirectory,
     ChangeGameDirectory,
+    I18nBundle {
+        locale: String,
+    },
     Versions,
+    ForgeOptions {
+        version: String,
+        kind: String,
+    },
     FabricOptions {
         version: String,
     },
@@ -632,7 +639,20 @@ async fn launcher_action(
             }
             serde_json::Value::Null
         }
+        LauncherAction::I18nBundle { locale } => {
+            let lease = core.lease();
+            core.plugins.call_service(
+                &lease.settings,
+                "i18n",
+                "i18n",
+                "bundle",
+                serde_json::json!({"root":lease.root,"locale":locale}),
+            )?
+        }
         LauncherAction::Versions => serde_json::to_value(core.versions().await?)?,
+        LauncherAction::ForgeOptions { version, kind } => {
+            core.forge_options(&version, &kind).await?
+        }
         LauncherAction::FabricOptions { version } => core.fabric_options(&version).await?,
         LauncherAction::CreateInstance {
             version,

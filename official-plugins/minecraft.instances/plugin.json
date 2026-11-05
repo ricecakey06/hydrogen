@@ -44,7 +44,8 @@
         "migration.preview",
         "migration.execute",
         "poll",
-        "cancel"
+        "cancel",
+        "normalize"
       ]
     }
   ]

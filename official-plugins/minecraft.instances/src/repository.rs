@@ -223,6 +223,7 @@ fn resolve(
             ("net.fabricmc:fabric-loader:", "Fabric"),
             ("org.quiltmc:quilt-loader:", "Quilt"),
             ("net.neoforged:neoforge:", "NeoForge"),
+            ("net.neoforged:forge:", "NeoForge"),
             ("net.minecraftforge:forge:", "Forge"),
             ("optifine:OptiFine:", "OptiFine"),
         ] {
@@ -457,6 +458,7 @@ pub fn publish(
     base: &Value,
     complete: &Value,
     loader: Option<&str>,
+    loader_kind: &str,
 ) -> Result<()> {
     if !valid_name(name) {
         return Err(error("版本目录名无效。"));
@@ -505,6 +507,13 @@ pub fn publish(
     manifest["root"] = true.into();
     manifest["jar"] = name.into();
     manifest["patches"] = json!(patches);
+    if matches!(loader_kind, "forge" | "neoforge") {
+        // Forge may replace both legacy game arguments and vanilla library versions.
+        // Persist the fully merged manifest instead of an append-only Fabric patch.
+        manifest.as_object_mut().unwrap().remove("patches");
+        manifest.as_object_mut().unwrap().remove("root");
+        manifest["clientVersion"] = game_version.into();
+    }
     let destination = storage::within(root, &format!("versions/{name}/{name}.json"))?;
     if destination.exists() {
         return Err(error("版本 JSON 已存在，拒绝覆盖。请刷新后重试。"));

@@ -214,6 +214,19 @@ impl Launcher {
         Ok(file)
     }
     pub fn save_settings(&self, settings: Settings) -> Result<()> {
+        let lease = self.lease();
+        if settings.locale != lease.settings.locale
+            && self.plugins.available(&lease.settings, "i18n")
+        {
+            self.plugins.call_service(
+                &lease.settings,
+                "i18n",
+                "i18n",
+                "bundle",
+                serde_json::json!({"root":lease.root,"locale":settings.locale}),
+            )?;
+        }
+        drop(lease);
         let _identity = self.identity.lock().unwrap();
         let settings: Settings = serde_json::from_value(self.client.service(
             "storage",
@@ -418,14 +431,30 @@ impl Launcher {
         let _lease = self.lease();
         minecraft::fabric_options(&self.client, version).await
     }
+    pub async fn forge_options(&self, version: &str, kind: &str) -> Result<Value> {
+        self.require("minecraft.forge")?;
+        let lease = self.lease();
+        net::task(
+            &self.client,
+            "minecraft.forge",
+            "options",
+            serde_json::json!({"version":version,"kind":kind,"settings":lease.settings}),
+            None,
+        )
+        .await
+    }
     pub async fn create(
         self: &Arc<Self>,
         version: String,
         name: String,
         components: Option<Components>,
     ) -> Result<String> {
-        if components.is_some() {
-            self.require("minecraft.fabric")?;
+        if let Some(component) = &components {
+            self.require(if matches!(component.kind.as_str(), "forge" | "neoforge") {
+                "minecraft.forge"
+            } else {
+                "minecraft.fabric"
+            })?;
         }
         let _lease = self.lease();
         let state = self.store.lock().unwrap().state();

@@ -285,6 +285,10 @@ mod tests {
                                 end.trim().parse::<usize>().unwrap(),
                             )
                         });
+                    if mode == "range_busy" && range.is_some() && range != Some((0, 0)) {
+                        let _ = stream.write_all(b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").await;
+                        return;
+                    }
                     let partial = range.is_some()
                         && mode != "ignore"
                         && !(mode == "fallback" && range != Some((0, 0)));
@@ -311,6 +315,10 @@ mod tests {
                         )
                     };
                     if stream.write_all(header.as_bytes()).await.is_ok() {
+                        if mode == "interrupted" && range.is_some() && range != Some((0, 0)) {
+                            let _ = stream.write_all(&body[..body.len() / 2]).await;
+                            return;
+                        }
                         if mode == "slow" {
                             for chunk in body.chunks(64 * 1024) {
                                 if stream.write_all(chunk).await.is_err() {
@@ -330,7 +338,14 @@ mod tests {
 
     #[tokio::test]
     async fn segmented_download_and_both_full_download_fallbacks_verify_identical_content() {
-        for mode in ["ranges", "ignore", "fallback"] {
+        for mode in [
+            "ranges",
+            "ignore",
+            "fallback",
+            "wrong",
+            "interrupted",
+            "range_busy",
+        ] {
             let (url, data, ranges, server) = server(mode).await;
             let root = tempfile::tempdir().unwrap();
             let tasks = Tasks::default();
@@ -383,14 +398,7 @@ mod tests {
                 &job,
             )
             .await;
-            assert_eq!(
-                result.unwrap_err().code,
-                if mode == "wrong" {
-                    "INVALID_RANGE"
-                } else {
-                    "HASH_MISMATCH"
-                }
-            );
+            assert_eq!(result.unwrap_err().code, "HASH_MISMATCH");
             assert_eq!(std::fs::read(&destination).unwrap(), b"original");
             assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 1);
             server.abort();

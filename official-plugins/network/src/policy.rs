@@ -29,6 +29,7 @@ pub fn trusted(url: &Url) -> bool {
                 "cdn.jsdelivr.net",
                 "raw.githubusercontent.com",
                 "bmclapi2.bangbang93.com",
+                "mirror.nju.edu.cn",
                 "login.microsoftonline.com",
                 "user.auth.xboxlive.com",
                 "xsts.auth.xboxlive.com",

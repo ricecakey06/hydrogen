@@ -84,6 +84,11 @@ impl State {
                 _ => Err(ApiError::new("UNKNOWN_METHOD", "未知实例记录方法。")),
             };
         }
+        if method == "normalize" {
+            let mut metadata = p["metadata"].clone();
+            repository::normalize(&mut metadata, text(p, "gameVersion")?)?;
+            return Ok(metadata);
+        }
         let root = Path::new(text(p, "root")?);
         match method {
             "instanceId" => Ok(json!(repository::instance_id(root, text(p, "name")?))),
@@ -113,6 +118,7 @@ impl State {
                 &p["base"],
                 &p["complete"],
                 p["loader"].as_str(),
+                p["loaderKind"].as_str().unwrap_or("fabric"),
             )?)?),
             _ => Err(ApiError::new("UNKNOWN_METHOD", "未知实例方法。")),
         }

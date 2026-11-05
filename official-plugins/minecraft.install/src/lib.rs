@@ -60,8 +60,14 @@ async fn install(mut state: Value, mut instance: Value, job: Arc<Job>) -> Result
     job.phase("downloading", "正在下载并校验游戏文件…");
     let mut prepared=service_task("minecraft.preinstall","prepare",json!({"gameRoot":game_root,"settings":settings,"metadata":metadata,"architecture":if cfg!(target_arch="aarch64"){"arm64"}else{"x64"}}),&job).await?;
     if !existing && instance["components"].is_object() {
-        job.phase("preparing", "正在准备 Fabric…");
-        prepared=service_task("minecraft.fabric","prepare",json!({"root":root,"gameRoot":game_root,"game":game,"settings":settings,"version":version,"components":instance["components"],"prepared":prepared,"installing":true}),&job).await?;
+        let kind = instance["components"]["kind"].as_str().unwrap_or("fabric");
+        let service = if matches!(kind, "forge" | "neoforge") {
+            "minecraft.forge"
+        } else {
+            "minecraft.fabric"
+        };
+        job.phase("preparing", "正在准备模组加载器…");
+        prepared=service_task(service,"prepare",json!({"root":root,"gameRoot":game_root,"game":game,"settings":settings,"version":version,"components":instance["components"],"prepared":prepared,"installing":true}),&job).await?;
     }
     job.check()?;
     job.phase("committing", "正在提交安装状态…");
@@ -70,7 +76,7 @@ async fn install(mut state: Value, mut instance: Value, job: Arc<Job>) -> Result
             "minecraft.instances",
             "minecraft.instances",
             "publish",
-            json!({"root":game_root,"name":directory,"gameVersion":version,"base":base,"complete":prepared["metadata"],"loader":instance["components"]["loader"]}),
+            json!({"root":game_root,"name":directory,"gameVersion":version,"base":base,"complete":prepared["metadata"],"loader":instance["components"]["loader"],"loaderKind":instance["components"]["kind"]}),
         )?;
     }
     instance = invoke(

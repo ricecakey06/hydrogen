@@ -16,6 +16,8 @@ use std::{
 pub struct Version {
     pub id: String,
     pub release_time: String,
+    #[serde(default)]
+    pub version_type: String,
 }
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Prepared {

@@ -282,6 +282,7 @@ pub fn preview(
                 return Err(error("旧 Fabric 版本无效。"));
             }
             Some(Components {
+                kind: String::new(),
                 loader,
                 fabric_api: selection["addonOptionId"].as_str().map(String::from),
             })

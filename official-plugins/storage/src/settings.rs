@@ -4,6 +4,8 @@ use std::{collections::BTreeMap, path::Path};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Settings {
+    #[serde(default = "default_locale")]
+    pub locale: String,
     #[serde(default)]
     pub game_directory: Option<String>,
     #[serde(default)]
@@ -23,9 +25,13 @@ pub struct Settings {
     pub microsoft_client_id: String,
     pub modules: BTreeMap<String, bool>,
 }
+fn default_locale() -> String {
+    "zh-CN".into()
+}
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            locale: default_locale(),
             game_directory: None,
             isolate_game_directory: None,
             java: None,
@@ -234,6 +240,15 @@ impl Settings {
     }
 
     pub fn validate(&self) -> Result<()> {
+        if self.locale.len() > 35
+            || self.locale.is_empty()
+            || !self
+                .locale
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        {
+            return Err(ApiError::new("INVALID_LOCALE", "语言标识无效。"));
+        }
         if !(512..=memory_advice().total_mib).contains(&self.max_memory_mib)
             || !["default", "custom", "fullscreen"].contains(&self.window_mode.as_str())
             || !(320..=16384).contains(&self.window_width)

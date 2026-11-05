@@ -22,5 +22,7 @@
   "platform.windows.window": "hydrogen_platform_windows_window",
   "ui.shell": "hydrogen_ui_shell",
   "ui.launcher": "hydrogen_ui_launcher",
-  "plugins.manager": "hydrogen_plugins_manager"
+  "plugins.manager": "hydrogen_plugins_manager",
+  "minecraft.forge": "hydrogen_minecraft_forge",
+  "i18n": "hydrogen_i18n"
 }

@@ -10,6 +10,8 @@ use std::{
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Settings {
+    #[serde(default = "default_locale")]
+    pub locale: String,
     #[serde(default)]
     pub game_directory: Option<String>,
     #[serde(default)]
@@ -29,9 +31,13 @@ pub struct Settings {
     pub microsoft_client_id: String,
     pub modules: BTreeMap<String, bool>,
 }
+fn default_locale() -> String {
+    "zh-CN".into()
+}
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            locale: default_locale(),
             game_directory: None,
             isolate_game_directory: None,
             java: None,
@@ -74,6 +80,8 @@ pub struct Overrides {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Components {
+    #[serde(default)]
+    pub kind: String,
     pub loader: String,
     pub fabric_api: Option<String>,
 }

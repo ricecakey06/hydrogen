@@ -103,6 +103,7 @@ async fn game_content_and_private_instances_use_the_game_root_instead_of_launche
         &settings,
         "1.20.1",
         &Components {
+            kind: String::new(),
             loader: "0.16.10".into(),
             fabric_api: None,
         },
@@ -192,6 +193,7 @@ fn default_custom_roots_and_deletion_match_the_original_layout() {
                 "1.20.1",
                 "第一个实例",
                 Some(Components {
+                    kind: String::new(),
                     loader: "0.16.10".into(),
                     fabric_api: None,
                 }),
@@ -202,6 +204,7 @@ fn default_custom_roots_and_deletion_match_the_original_layout() {
                 "1.20.1",
                 "第二个实例",
                 Some(Components {
+                    kind: String::new(),
                     loader: "0.16.10".into(),
                     fabric_api: None,
                 }),

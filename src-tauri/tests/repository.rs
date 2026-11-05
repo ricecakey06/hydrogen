@@ -322,6 +322,7 @@ async fn new_install_publishes_repository_named_versions_shared_fabric_libraries
         (
             "Fabric 新安装",
             Some(storage::Components {
+                kind: String::new(),
                 loader: "0.16.10".into(),
                 fabric_api: None,
             }),
