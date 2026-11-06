@@ -37,11 +37,68 @@ fn launch_args(
     prepared: &Value,
     settings: &Settings,
     root: &Path,
+    java_major: u32,
 ) -> Vec<String> {
     serde_json::from_value(client.service("minecraft.launch","arguments",json!({"game":prepared,"settings":settings,
-        "java":{"path":"unused","version":"8","major":8,"architecture":"x64"},
+        "java":{"path":"unused","version":java_major.to_string(),"major":java_major,"architecture":"x64"},
         "session":{"name":"Test Player","uuid":"00000000000000000000000000000000","access_token":"0","xuid":"","client_id":"","expires":0,"offline":true},
         "directory":root,"natives":root.join("natives")})).unwrap()).unwrap()
+}
+
+#[tokio::test]
+async fn lwjgl_unsafe_agent_is_added_only_to_compatible_launches() {
+    let temp = tempfile::tempdir().unwrap();
+    let host = common::plugin_host(&temp.path().join("data"));
+    let mut settings = Settings::default();
+    let client = net::client(&host, &settings).unwrap();
+    let directory = temp.path().join("game = fixture");
+    let mut prepared = json!({"metadata":base("26.1.2", true),"classpath":[directory.join("client.jar")],
+        "natives":[],"assets":directory.join("assets"),"libraries":directory.join("libraries"),"asset_index":"test"});
+    let agent = ".hydrogen/lwjgl-unsafe-agent-2.0.jar";
+    let path = directory.join(agent);
+    for (major, library, expected) in [
+        (24, json!({"name":"org.lwjgl:lwjgl:3.4.1"}), false),
+        (
+            25,
+            json!({"name":"org.lwjgl:lwjgl:3.4.1:natives-windows"}),
+            false,
+        ),
+        (
+            25,
+            json!({"name":"org.lwjgl:lwjgl:3.4.1","rules":[{"action":"disallow"}]}),
+            false,
+        ),
+        (25, json!({"name":"org.lwjgl:lwjgl:3.3.1"}), false),
+        (25, json!({"name":"org.lwjgl:lwjgl:3.4.3"}), false),
+        (25, json!({"name":"org.lwjgl:lwjgl:3.4.0"}), true),
+        (26, json!({"name":"org.lwjgl:lwjgl:3.4.1"}), true),
+    ] {
+        prepared["metadata"]["libraries"] = json!([library]);
+        let args = launch_args(&client, &prepared, &settings, &directory, major);
+        assert_eq!(path.is_file(), expected);
+        let main = args
+            .iter()
+            .position(|arg| arg == "net.minecraft.client.main.Main")
+            .unwrap();
+        assert_eq!(
+            args[..main].contains(&format!("-javaagent:{agent}")),
+            expected
+        );
+    }
+    let bundled = fs::read(&path).unwrap();
+    fs::write(&path, b"corrupt cached JAR").unwrap();
+    launch_args(&client, &prepared, &settings, &directory, 25);
+    assert_eq!(fs::read(&path).unwrap(), bundled);
+
+    let custom = "-javaagent:custom/lwjgl-unsafe-agent.jar=options";
+    settings.jvm_arguments = custom.into();
+    let args = launch_args(&client, &prepared, &settings, &directory, 25);
+    assert_eq!(
+        args.iter()
+            .filter(|arg| arg.starts_with("-javaagent:"))
+            .collect::<Vec<_>>(),
+        [custom]
+    );
 }
 
 #[tokio::test]
@@ -105,6 +162,7 @@ async fn old_releases_and_snapshots_resolve_prepare_and_build_launch_arguments()
             &serde_json::to_value(prepared).unwrap(),
             &settings,
             &game,
+            major,
         );
         assert!(args.contains(&"Test Player".into()));
         assert!(!args.iter().any(|a| a.contains("${")));
@@ -252,6 +310,7 @@ async fn cached_legacy_and_modern_forge_installers_publish_launchable_manifests(
             &serde_json::to_value(prepared).unwrap(),
             &settings,
             &game,
+            8,
         );
         assert_eq!(args.iter().filter(|a| *a == "--username").count(), 1);
         assert!(

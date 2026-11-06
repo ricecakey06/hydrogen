@@ -75,10 +75,13 @@ def read_package(archive_data, ecosystem):
     return metadata, notices, source_copyright
 
 
-def upstream_texts(urls):
-    for url in urls:
-        address, _, member = url.partition("#")
-        data = download(address, hashlib.sha256(address.encode()).hexdigest())
+def notice_texts(sources):
+    for source in sources:
+        address, _, member = source.partition("#")
+        if "://" in address:
+            data = download(address, hashlib.sha256(address.encode()).hexdigest())
+        else:
+            data = (ROOT / address).read_bytes()
         if member:
             with ZipFile(BytesIO(data)) as archive:
                 data = archive.read(member)
@@ -132,7 +135,7 @@ def main():
             parent = {"@rolldown/binding-": "rolldown", "@tauri-apps/cli-": "@tauri-apps/cli"}[prefix]
             files = collected[ecosystem, parent, version][1]
         key = f"{ecosystem}:{name}@{version}"
-        upstream = list(upstream_texts(sources["supplements"].get(key, [])))
+        upstream = list(notice_texts(sources["supplements"].get(key, [])))
         if not upstream and not any(NOTICE.match(path.split("/")[-1]) and
                                     not path.split("/")[-1].lower().startswith(("notice", "authors", "copyright"))
                                     for path in files):
@@ -148,7 +151,8 @@ def main():
     if missing:
         raise SystemExit("Provide upstream license files in licenses/sources.json for:\n" + "\n".join(missing))
     for item in sources["bundled"]:
-        add_package("Native", item["name"], item["version"], item["license"], upstream_texts(item["files"]))
+        add_package(item.get("ecosystem", "Native"), item["name"], item["version"], item["license"],
+                    notice_texts(item["files"]))
     packages.sort(key=lambda item: (item["name"].lower(), item["ecosystem"], item["version"]))
     result = {"locks": {name: hashlib.sha256(data.encode()).hexdigest() for name, data in locks.items()},
               "packages": packages, "texts": list(texts)}

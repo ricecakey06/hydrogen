@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
-    fs::OpenOptions,
+    fs::{File, OpenOptions},
     io::Read,
     path::{Path, PathBuf},
 };
@@ -86,6 +86,58 @@ fn jvm_arguments(client: &Client, text: &str) -> Result<Vec<String>> {
         "jvmArguments",
         json!({"text":text}),
     )?)?)
+}
+fn add_lwjgl_unsafe_agent(
+    client: &Client,
+    game: &Prepared,
+    java: &Java,
+    directory: &Path,
+    args: &mut Vec<String>,
+) -> Result<()> {
+    if java.major < 25
+        || args.iter().any(|arg| {
+            arg.strip_prefix("-javaagent:")
+                .and_then(|path| path.split('=').next())
+                .and_then(|path| path.rsplit(['/', '\\']).next())
+                .is_some_and(|name| {
+                    name == "lwjgl-unsafe-agent.jar"
+                        || (name.starts_with("lwjgl-unsafe-agent-") && name.ends_with(".jar"))
+                })
+        })
+    {
+        return Ok(());
+    }
+    for library in game.metadata["libraries"].as_array().into_iter().flatten() {
+        let name = library["name"]
+            .as_str()
+            .map(|name| name.trim_end_matches("@jar"));
+        if matches!(
+            name,
+            Some("org.lwjgl:lwjgl:3.4.0" | "org.lwjgl:lwjgl:3.4.1")
+        ) && allows(client, library, &java.architecture, false)?
+        {
+            const JAR: &[u8] = include_bytes!("../assets/lwjgl-unsafe-agent-2.0.jar");
+            // Resolve from the game's working directory so '=' in its path is safe.
+            const RELATIVE: &str = ".hydrogen/lwjgl-unsafe-agent-2.0.jar";
+            let path = storage::within(directory, RELATIVE)?;
+            let cached = || {
+                let mut bytes = Vec::new();
+                File::open(&path)
+                    .and_then(|file| file.take(JAR.len() as u64 + 1).read_to_end(&mut bytes))
+                    .is_ok()
+                    && bytes == JAR
+            };
+            if !cached()
+                && let Err(error) = storage::atomic_write(&path, JAR)
+                && !cached()
+            {
+                return Err(error);
+            }
+            args.push(format!("-javaagent:{RELATIVE}"));
+            break;
+        }
+    }
+    Ok(())
 }
 pub fn arguments(
     client: &hydrogen_plugin_services::net::Client,
@@ -198,6 +250,7 @@ pub fn arguments(
         args.push(logging.clone());
     }
     args.extend(jvm_arguments(client, &settings.jvm_arguments)?);
+    add_lwjgl_unsafe_agent(client, game, java, directory, &mut args)?;
     let main = hydrogen_plugin_services::text(&game.metadata, "mainClass")?;
     if !regex::Regex::new(r"^[a-zA-Z_$][a-zA-Z0-9_.$]+$")
         .unwrap()

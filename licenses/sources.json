@@ -8,6 +8,15 @@
       "license": "BSD-3-Clause",
       "name": "Microsoft WebView2 Loader",
       "version": "1.0.3800.47"
+    },
+    {
+      "ecosystem": "Java",
+      "files": [
+        "official-plugins/minecraft.launch/assets/lwjgl-unsafe-agent-2.0-LICENSE.txt"
+      ],
+      "license": "Apache-2.0",
+      "name": "LWJGL Unsafe Agent",
+      "version": "2.0"
     }
   ],
   "supplements": {
