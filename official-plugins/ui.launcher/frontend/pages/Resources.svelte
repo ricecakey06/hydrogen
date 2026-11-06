@@ -63,6 +63,10 @@
   const inputDelay = 300;
   const cardMoveDuration = () => matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 190;
   const emptyQuery: Query = { query: '', gameVersion: '', category: '', loader: '', source: 'minecraft.resources:modrinth' };
+  const sourceIcons: Partial<Record<Source, string>> = {
+    'minecraft.resources:modrinth': 'modrinth',
+    'minecraft.resources:curseforge': 'curseforge',
+  };
   const sources = $derived(Object.fromEntries((snapshot?.plugins ?? []).filter(p => p.enabled && !p.problem)
     .flatMap(p => (p.providers ?? []).filter(c => c.kind === 'resourceSource').map(c => [p.id + ':' + c.id, c.title]))));
   const sourceIds = $derived(Object.keys(sources));
@@ -378,7 +382,7 @@
                       aria-label={`${t("当前来源")} ${sources[query.source]}`}
                       onclick={() => sourceMenuOpen ? closeSourceMenu() : void openSourceMenu(sourceIds.indexOf(query.source))}
                       onkeydown={event => sourceKeydown(event, -1)}>
-                <Icon name={query.source} size={16} />
+                <Icon name={sourceIcons[query.source] ?? 'puzzle'} size={16} />
                 {sources[query.source]}
                 <span class="source-arrow"><Icon name="chevron" size={14} /></span>
               </button>
@@ -387,7 +391,7 @@
                   {#each sourceIds as source, index (source)}
                     <button data-h-part="button" type="button" class="source-option" role="menuitemradio" aria-checked={query.source === source} tabindex="-1"
                             onclick={() => { changeSource(source); closeSourceMenu(); }} onkeydown={event => sourceKeydown(event, index)}>
-                      <Icon name={source} size={16} />
+                      <Icon name={sourceIcons[source] ?? 'puzzle'} size={16} />
                       {sources[source]}
                       {#if query.source === source}<span class="source-check"><Icon name="check" size={14} /></span>{/if}
                     </button>
