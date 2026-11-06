@@ -181,6 +181,8 @@ async fn native_command_can_call_a_javascript_service() {
     let mut descriptor: Value =
         serde_json::from_slice(&fs::read(project.join("example.services/plugin.json")).unwrap())
             .unwrap();
+    let entry = format!("bin/plugin{}", std::env::consts::DLL_SUFFIX);
+    descriptor["entry"] = entry.clone().into();
     descriptor["dependencies"] = json!([{"id":"example.provider","version":"^1"}]);
     descriptor["contributes"] = json!({"commands":[{"id":"forward","title":"Forward"}]});
     fs::copy(
@@ -189,7 +191,7 @@ async fn native_command_can_call_a_javascript_service() {
             std::env::consts::DLL_PREFIX,
             std::env::consts::DLL_SUFFIX
         )),
-        source.join("bin/plugin.dll"),
+        source.join(entry),
     )
     .unwrap();
     fs::write(
