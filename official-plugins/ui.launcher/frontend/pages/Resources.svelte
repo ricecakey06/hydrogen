@@ -366,7 +366,11 @@
 
 <div class="resources-page">
   <div class="catalog" hidden={!!project}>
-    <form class="search-form" role="search" aria-labelledby="resource-search-title" onsubmit={event => { event.preventDefault(); refresh(query); }}>
+    <form class="search-form" role="search" aria-labelledby="resource-search-title" onsubmit={event => {
+      event.preventDefault();
+      const fields = new FormData(event.currentTarget);
+      changeFilters({ query: String(fields.get('query') ?? '') });
+    }}>
       <div class="catalog-hero">
         <div class="hero-art" aria-hidden="true"><Icon name="cube" size={168} width={0.65} /></div>
         <div class="hero-heading">
@@ -404,9 +408,10 @@
         <div class="search-bar">
           <div class="search-input">
             <Icon name="search" size={18} />
-            <input data-h-part="input-shell" type="search" value={query.query} maxlength="160" aria-label={t("搜索模组名称")} placeholder={t("按名称搜索，例如 Sodium")} oninput={event => {
+            <input data-h-part="input-shell" type="search" name="query" value={query.query} maxlength="160" aria-label={t("搜索模组名称")} placeholder={t("按名称搜索，例如 Sodium")} oninput={event => {
+              query.query = event.currentTarget.value;
               if (!(event instanceof InputEvent && event.isComposing)) changeFilters({ query: event.currentTarget.value }, inputDelay);
-            }} />
+            }} oncompositionend={event => changeFilters({ query: event.currentTarget.value }, inputDelay)} />
           </div>
           <button data-h-part="button" data-h-variant="primary" type="submit" class="primary search-submit">{t("搜索")}</button>
         </div>

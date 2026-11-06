@@ -2,6 +2,18 @@
 
 fn main() {
     if let Err(error) = hydrogen::desktop::run() {
+        // Startup probes must record failures instead of waiting on a modal dialog.
+        let mut args = std::env::args();
+        if let Some(path) = args
+            .find(|arg| arg == "--benchmark-ready-file")
+            .and_then(|_| args.next())
+        {
+            let _ = std::fs::write(
+                std::path::Path::new(&path).with_extension("error.log"),
+                error.to_string(),
+            );
+            std::process::exit(1);
+        }
         #[cfg(windows)]
         unsafe {
             use windows_sys::Win32::UI::WindowsAndMessaging::{MB_ICONERROR, MB_OK, MessageBoxW};
