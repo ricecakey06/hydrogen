@@ -12,10 +12,14 @@ export function preparationSummary(task: Task | undefined) {
   return { progress: fraction, text, detail: active ? `${text} · ${active}` : text };
 }
 
+export function downloadRetryable(task: Task) {
+  return ['failed', 'cancelled'].includes(task.phase)
+    && (task.kind === 'modpackImport' || task.kind === 'install' && task.instanceId !== null);
+}
+
 export function downloadJobs(tasks: readonly Task[]) {
   return tasks.filter(task => ['install', 'modDownload', 'modUpdate', 'modpackImport'].includes(task.kind)
-    && (taskActive(task) || task.phase === 'failed'
-      || task.kind === 'modpackImport' && task.phase === 'cancelled' && task.instanceId));
+    && (taskActive(task) || task.phase === 'failed' || downloadRetryable(task)));
 }
 export function downloadSummary(jobs: readonly Task[]) {
   const active = jobs.filter(taskActive).length;
@@ -24,7 +28,7 @@ export function downloadSummary(jobs: readonly Task[]) {
   const completed = jobs.reduce((sum, task) => sum + Math.min(task.download?.completed ?? 0, task.download?.total ?? 0), 0);
   const percent = total > 0 ? Math.max(0, Math.min(100, 100 * completed / total)) : 0;
   const text = active > 0 ? indeterminate ? t("{0} 个任务正在准备",active) : t("总体进度 {0}% · {1} 个任务正在下载",Math.round(percent),active)
-    : jobs.length ? t("下载已停止，可重试未完成的任务") : t("没有进行中的下载");
+    : jobs.some(downloadRetryable) ? t("下载已停止，可重试未完成的任务") : jobs.length ? t("下载已停止") : t("没有进行中的下载");
   return { indeterminate, percent, text };
 }
 export function downloadBytes(value: number) {

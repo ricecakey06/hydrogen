@@ -6,9 +6,9 @@
   import { action, errorMessage, taskActive, type Snapshot, type GameVersion } from '../../../ui.shell/frontend/lib/api';
   import { entrance } from '../../../ui.shell/frontend/lib/motion';
   // Keep selection primary within each row, with neutral 44px settings/launch actions (§2.8, §3.2).
-  let { snapshot, mode = $bindable('instances'), onselect, onsettings, onlaunch, ondownloads, onimportpack, onchange }: {
+  let { snapshot, mode = $bindable('instances'), onselect, onsettings, onlaunch, onrepair, ondownloads, onimportpack, onchange }: {
     snapshot: Snapshot | null; mode: 'instances' | 'catalog' | 'configure';
-    onselect: (id: string) => void; onsettings: (id: string) => void; onlaunch: (id: string) => Promise<void>; ondownloads: () => void; onimportpack?: () => void; onchange: () => Promise<void>;
+    onselect: (id: string) => void; onsettings: (id: string) => void; onlaunch: (id: string) => Promise<void>; onrepair: (id: string) => Promise<void>; ondownloads: () => void; onimportpack?: () => void; onchange: () => Promise<void>;
   } = $props();
   const externalLoaders = $derived((snapshot?.plugins ?? []).filter(p => p.enabled && !p.problem && !['minecraft.fabric','minecraft.forge'].includes(p.id))
     .flatMap(p => (p.providers ?? []).filter(c => c.kind === 'loaderProvider').map(c => ({ id: p.id + ':' + c.id, title: c.title }))));
@@ -29,7 +29,7 @@
   let forgeOptions = $state<Record<string, Loader[]>>({ forge: [], neoforge: [] });
   let loaded = $state<LoaderKind[]>([]); let request = 0;
   const visibleVersions = $derived(versions.filter(v => (filter === 'all' || v.versionType === filter) && v.id.toLowerCase().includes(search.toLowerCase())));
-  const installed = $derived(snapshot?.instances.filter(instance => instance.isInstalled) ?? []);
+  const instances = $derived(snapshot?.instances ?? []);
   const login = $derived(snapshot?.tasks.some(task => task.kind === 'login' && taskActive(task)));
   $effect(() => { const key = `${snapshot?.dataDirectory}/${snapshot?.settings.downloadSource}`; if (mode === 'catalog' && snapshot && catalogKey !== key) { catalogKey = key; void refreshVersions(); } });
   async function refreshVersions() { busy = true; error = ''; try { versions = await action<GameVersion[]>('versions'); } catch (e) { error = errorMessage(e); } finally { busy = false; } }
@@ -75,9 +75,9 @@
 <div class="versions-page">
   {#key mode}<div class="version-pane" in:entrance|global>
   {#if mode === 'instances'}
-    <div class="section-row"><h2 class="section-label">{t("已安装实例")}</h2>{#if onimportpack}<button data-h-part="button" class="text-button" disabled={snapshot?.readOnly} onclick={onimportpack}>{t("导入整合包")}</button>{/if}</div>
+    <div class="section-row"><h2 class="section-label">{t("游戏实例")}</h2>{#if onimportpack}<button data-h-part="button" class="text-button" disabled={snapshot?.readOnly} onclick={onimportpack}>{t("导入整合包")}</button>{/if}</div>
     <div class="scroll-pane instances-list">
-      {#each installed as instance (instance.id)}
+      {#each instances as instance (instance.id)}
         {@const activeTask = snapshot?.tasks.find(task => task.instanceId === instance.id && taskActive(task))}
         {@const launchTitle = activeTask ? activeTask.kind === 'launch' && activeTask.phase === 'running' ? t("游戏正在运行") : t("此实例有任务正在进行") : login ? t("请等待账号登录完成") : launching ? t("正在提交启动请求") : snapshot?.account.status !== 'signedIn' ? t("前往档案管理登录") : t("启动 {0}", instance.name)}
         <PluginContextMenu {snapshot} location="instance.contextMenu" context={{ instanceId: instance.id }} {onchange}>
@@ -87,12 +87,16 @@
             {#if snapshot?.selectedInstanceId === instance.id}<span class="current-instance">{t("当前实例")}</span>{/if}
           </button>
           <button data-h-part="button" class="icon-button instance-settings" aria-label={t("{0}的实例设置", instance.name)} onclick={() => onsettings(instance.id)}><Icon name="settings" size={22} /></button>
-          <button data-h-part="button" data-h-variant="launch" class="icon-button instance-launch" aria-label={t("启动实例：{0}", instance.name)} title={launchTitle} disabled={!!launching || !!login || !!activeTask} onclick={() => launch(instance.id)}><Icon name="play" size={22} /></button>
+          {#if instance.isInstalled}
+            <button data-h-part="button" data-h-variant="launch" class="icon-button instance-launch" aria-label={t("启动实例：{0}", instance.name)} title={launchTitle} disabled={!!launching || !!login || !!activeTask} onclick={() => launch(instance.id)}><Icon name="play" size={22} /></button>
+          {:else}
+            <button data-h-part="button" disabled={!!activeTask || snapshot?.readOnly} onclick={() => onrepair(instance.id)}>{t("重试安装")}</button>
+          {/if}
         </div>
         </PluginContextMenu>
       {:else}<div class="empty-state">{t("还没有安装完成的实例")}</div>{/each}
     </div>
-    <div class="versions-footer"><p class="caption">{onimportpack ? t("将 .mrpack 或 .zip 整合包拖入窗口即可安装。") : `${installed.length} ${t("个隔离实例 · 各自保留模组与存档")}`}</p><button data-h-part="button" class="full-width" onclick={() => mode = 'catalog'}>{t("添加版本")}</button></div>
+    <div class="versions-footer"><p class="caption">{onimportpack ? t("将 .mrpack 或 .zip 整合包拖入窗口即可安装。") : `${instances.length} ${t("个隔离实例 · 各自保留模组与存档")}`}</p><button data-h-part="button" class="full-width" onclick={() => mode = 'catalog'}>{t("添加版本")}</button></div>
   {:else if mode === 'catalog'}
     <div class="section-row"><h2 class="section-label">{t("选择游戏版本")}</h2><button data-h-part="button" class="text-button" disabled={busy} onclick={refreshVersions}>{t("刷新目录")}</button></div>
     <div class="field-row">

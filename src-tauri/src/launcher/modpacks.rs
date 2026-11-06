@@ -2,7 +2,7 @@ use super::{
     core::Launcher,
     net, repository,
     storage::{self, Components, Instance},
-    tasks::Job,
+    tasks::{InstallationRetry, Job},
 };
 use crate::contracts::{ApiError, Result};
 use serde_json::{Value, json};
@@ -89,6 +89,22 @@ impl Launcher {
     }
 
     pub async fn import_modpack(self: &Arc<Self>, source: PathBuf) -> Result<String> {
+        self.start_modpack_import(source, None).await
+    }
+
+    pub async fn retry_installation(self: &Arc<Self>, id: &str) -> Result<String> {
+        let _lease = self.lease();
+        match self.tasks.installation_retry(id)? {
+            InstallationRetry::Instance(instance) => self.install(instance),
+            InstallationRetry::Modpack(source) => self.start_modpack_import(source, Some(id)).await,
+        }
+    }
+
+    async fn start_modpack_import(
+        self: &Arc<Self>,
+        source: PathBuf,
+        retry: Option<&str>,
+    ) -> Result<String> {
         self.require(SERVICE)?;
         self.require("minecraft.install")?;
         let lease = self.lease();
@@ -110,7 +126,7 @@ impl Launcher {
             store.writable()?;
             import_name(&store, super::text(&preview, "name")?)?
         };
-        let job = self.tasks.start("modpackImport", None)?;
+        let job = self.tasks.start_modpack_import(source.clone(), retry)?;
         let task_id = label(&job, &name, &version);
         let core = self.clone();
         tauri::async_runtime::spawn(async move {

@@ -364,6 +364,9 @@ enum LauncherAction {
     Repair {
         id: String,
     },
+    RetryInstallation {
+        id: String,
+    },
     CancelTask {
         id: String,
     },
@@ -973,6 +976,9 @@ async fn launcher_action(
             serde_json::to_value(task)?
         }
         LauncherAction::Repair { id } => serde_json::to_value(core.install(id)?)?,
+        LauncherAction::RetryInstallation { id } => {
+            serde_json::to_value(core.retry_installation(&id).await?)?
+        }
         LauncherAction::CancelTask { id } => {
             core.tasks.cancel(&id)?;
             serde_json::Value::Null

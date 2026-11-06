@@ -2,14 +2,19 @@
   import PluginSlot from '../../../ui.shell/frontend/components/PluginSlot.svelte';
   import { t } from '../../../ui.shell/frontend/lib/i18n';
   import { action, errorMessage, taskActive, type Snapshot } from '../../../ui.shell/frontend/lib/api';
-  import { downloadItem, downloadJobs, downloadSummary } from '../../../ui.shell/frontend/lib/downloads';
+  import { downloadItem, downloadJobs, downloadRetryable, downloadSummary } from '../../../ui.shell/frontend/lib/downloads';
   import { animateText, entrance } from '../../../ui.shell/frontend/lib/motion';
   import DownloadProgress from '../../../ui.shell/frontend/components/DownloadProgress.svelte';
-  let { snapshot, onchange, onhome, onrepair, startError }: { snapshot: Snapshot | null; onchange: () => Promise<void>; onhome: () => void; onrepair: (id: string) => Promise<void>; startError: string } = $props();
+  let { snapshot, onchange, onhome, onretry, startError }: { snapshot: Snapshot | null; onchange: () => Promise<void>; onhome: () => void; onretry: (id: string) => Promise<void>; startError: string } = $props();
   let error = $state('');
+  let retrying = $state(false);
   const jobs = $derived(downloadJobs(snapshot?.tasks ?? []));
   const overall = $derived(downloadSummary(jobs));
-  async function retry(id: string) { error = ''; await onrepair(id); }
+  async function retry(id: string) {
+    if (retrying) return;
+    error = ''; retrying = true;
+    try { await onretry(id); } finally { retrying = false; }
+  }
   async function operate(type: string, fields: Record<string, unknown>) { error = ''; try { await action(type, fields); await onchange(); } catch (e) { error = errorMessage(e); } }
 </script>
 
@@ -29,7 +34,7 @@
         <PluginSlot {snapshot} location="downloads.taskActions" context={{ instanceId: task.instanceId ?? undefined, taskId: task.id, taskActive: taskActive(task) }} onchange={onchange} />
         <div class="task-heading"><h2 title={name}>{name}</h2>
           {#if taskActive(task)}<button data-h-part="button" class="text-button" disabled={task.phase === 'committing'} onclick={() => operate('cancelTask', { id: task.id })}>{t("取消")}</button>
-          {:else if task.instanceId && (task.kind === 'install' && task.phase === 'failed' || task.kind === 'modpackImport' && ['failed', 'cancelled'].includes(task.phase))}<button data-h-part="button" onclick={() => task.instanceId && retry(task.instanceId)}>{t("重试下载")}</button>{/if}
+          {:else if downloadRetryable(task)}<button data-h-part="button" disabled={retrying || snapshot?.readOnly} onclick={() => retry(task.id)}>{t("重试安装")}</button>{/if}
         </div>
         {#if name !== version}<p class="caption">{version}</p>{/if}
         <p class="download-status" use:animateText={task.phase}>{task.kind === 'modpackImport' ? t("导入整合包") + ' · ' : task.kind === 'modUpdate' ? t("模组更新") + ' · ' : task.kind === 'modDownload' ? t("模组下载") + ' · ' : ''}{item.status}</p>
