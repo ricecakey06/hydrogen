@@ -88,7 +88,7 @@
     try { if (await action<string | null>('modpackImport')) showDownloads(); }
     catch (e) { error = errorMessage(e); }
   }
-  async function startInstall(id: string) { downloadError = ''; navigate('downloads'); try { await action('repair', { id }); await load(); } catch (e) { downloadError = errorMessage(e); } }
+  async function startInstall(id: string, type: 'repair' | 'retryInstallation' = 'repair') { downloadError = ''; if (page !== 'downloads') navigate('downloads'); try { await action(type, { id }); await load(); } catch (e) { downloadError = errorMessage(e); } }
   function navigate(next: Page) { if (page === 'settings' && next !== 'settings') void cancelTheme(); navigationDirection = next === 'home' ? -1 : 1; page = next; error = ''; selectedPluginId = ''; resourceTrail = []; void load().catch(e => error = errorMessage(e)); }
   function toggleResources() {
     if (page === 'resources') { resourceExpanded = !resourceExpanded; return; }
@@ -290,7 +290,7 @@
         <div class="page-shell"><div data-h-part="page-heading" class="page-heading"><button data-h-part="button" class="icon-button back-button" aria-label={t("返回")} onclick={back}><Icon name="back" size={22} width={2.5} /></button><h1 use:animateText={pageTitle(activePage)}>{pageTitle(activePage)}</h1></div>
           {#if activePage === 'crash'}{#key crashTaskId}<CrashReport task={crashTask} onhome={() => navigate('home')} />{/key}
           {:else if activePage === 'profiles'}<Profiles {snapshot} onchange={load} ondelete={deleteProfile} />
-          {:else if activePage === 'versions'}<Versions {snapshot} bind:mode={versionMode} onselect={select} onsettings={showSettings} onlaunch={launchInstance} onimportpack={modpacksAvailable ? importModpack : undefined} ondownloads={showDownloads} onchange={load} />
+          {:else if activePage === 'versions'}<Versions {snapshot} bind:mode={versionMode} onselect={select} onsettings={showSettings} onlaunch={launchInstance} onrepair={startInstall} onimportpack={modpacksAvailable ? importModpack : undefined} ondownloads={showDownloads} onchange={load} />
           {:else if activePage === 'instance'}
             <PluginSlot {snapshot} location="instance.toolbar" context={{ instanceId: editing?.id }} onchange={load} />
             {#snippet packPanel(instance: InstanceInfo)}<Modpacks {instance} {snapshot} onchange={load} />{/snippet}
@@ -313,7 +313,7 @@
               {:else if settingsTab === 'plugins'}<Plugins plugins={snapshot?.plugins ?? []} bind:selectedId={selectedPluginId} oninstall={installPlugin} onuninstall={uninstallPlugin} onrefresh={refreshPlugins} />
               {:else}<About version={snapshot?.version} />{/if}
             </div>{/key}{/if}
-          {:else if activePage === 'downloads'}<Downloads {snapshot} onchange={load} onhome={() => navigate('home')} onrepair={startInstall} startError={downloadError} />
+          {:else if activePage === 'downloads'}<Downloads {snapshot} onchange={load} onhome={() => navigate('home')} onretry={id => startInstall(id, 'retryInstallation')} startError={downloadError} />
           {:else if activePage === 'resources'}
             {#if resourcesAvailable}<Resources {snapshot} bind:trail={resourceTrail} onchange={load} />
             {:else}<p class="empty-state">{t("资源下载插件不可用。")}</p>{/if}

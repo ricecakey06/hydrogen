@@ -443,6 +443,15 @@ async fn new_install_publishes_repository_named_versions_shared_fabric_libraries
 
 #[cfg(feature = "desktop")]
 async fn wait(core: &hydrogen::launcher::core::Launcher, id: &str) {
+    let task = finished_task(core, id).await;
+    assert_eq!(task.phase, "completed", "{}", task.message);
+}
+
+#[cfg(feature = "desktop")]
+async fn finished_task(
+    core: &hydrogen::launcher::core::Launcher,
+    id: &str,
+) -> hydrogen::launcher::tasks::Task {
     for _ in 0..500 {
         let task = core
             .tasks
@@ -451,12 +460,95 @@ async fn wait(core: &hydrogen::launcher::core::Launcher, id: &str) {
             .find(|task| task.id == id)
             .unwrap();
         if !task.active() {
-            assert_eq!(task.phase, "completed", "{}", task.message);
-            return;
+            return task;
         }
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     }
     panic!("cached install did not finish");
+}
+
+#[cfg(feature = "desktop")]
+#[tokio::test]
+async fn installation_retry_uses_the_original_archive_or_the_committed_instance() {
+    use hydrogen::launcher::core::Launcher;
+    use std::io::Write;
+
+    let fixture = tempfile::tempdir().unwrap();
+    let data = fixture.path().join("data");
+    let game = data.join(".minecraft");
+    let core = Launcher::open(Some(data.clone())).unwrap();
+    let mut settings = core.store.lock().unwrap().settings.clone();
+    settings.modules.insert("minecraft.download".into(), false);
+    core.save_settings(settings).unwrap();
+    let client = b"cached client";
+    let index = br#"{"objects":{}}"#;
+    let metadata = serde_json::to_vec(&json!({"id":"1.20.1","mainClass":"example.Main","type":"release",
+        "javaVersion":{"majorVersion":17},"arguments":{"game":[],"jvm":["-cp","${classpath}"]},"libraries":[],
+        "downloads":{"client":{"sha1":hash(client),"size":client.len()}},
+        "assetIndex":{"id":"5","sha1":hash(index),"size":index.len()}})).unwrap();
+    let checksum = hash(&metadata);
+    storage::write_json(
+        &data.join("cache/version-manifest.json"),
+        &json!({"versions":[{"id":"1.20.1","type":"release","url":"https://piston-meta.mojang.com/version.json","sha1":checksum}]}),
+    )
+    .unwrap();
+    write(
+        &data,
+        &format!("cache/manifests/{checksum}.json"),
+        &metadata,
+    );
+    write(&game, "versions/Cache/Cache.jar", client);
+
+    let source = fixture.path().join("retry.mrpack");
+    let write_pack = |path: &str| {
+        let mut zip = zip::ZipWriter::new(fs::File::create(&source).unwrap());
+        let options = zip::write::SimpleFileOptions::default();
+        zip.start_file("modrinth.index.json", options).unwrap();
+        zip.write_all(br#"{"formatVersion":1,"game":"minecraft","name":"Retry Pack","versionId":"1","files":[],"dependencies":{"minecraft":"1.20.1"}}"#).unwrap();
+        zip.start_file(path, options).unwrap();
+        zip.write_all(b"pack contents").unwrap();
+        zip.finish().unwrap();
+    };
+    write_pack("overrides/versions/blocked.txt");
+    let first = core.import_modpack(source.clone()).await.unwrap();
+    let failed = finished_task(&core, &first).await;
+    assert_eq!(failed.phase, "failed");
+    assert!(failed.instance_id.is_none());
+    fs::rename(&source, source.with_extension("bak")).unwrap();
+    assert!(core.retry_installation(&first).await.is_err());
+    write_pack("overrides/config/pack.txt");
+
+    let second = core.retry_installation(&first).await.unwrap();
+    assert!(core.retry_installation(&first).await.is_err());
+    let failed = finished_task(&core, &second).await;
+    assert_eq!(failed.phase, "failed");
+    let instance = failed.instance_id.unwrap();
+    assert_eq!(
+        fs::read(game.join("versions/Retry Pack/config/pack.txt")).unwrap(),
+        b"pack contents"
+    );
+    let vanilla = core
+        .create("1.20.1".into(), "Retry Vanilla".into(), None)
+        .await
+        .unwrap();
+    let failed = finished_task(&core, &vanilla).await;
+    assert_eq!(failed.phase, "failed");
+    let vanilla_instance = failed.instance_id.unwrap();
+
+    write(&game, "assets/indexes/5.json", index);
+    let retry = core.retry_installation(&second).await.unwrap();
+    wait(&core, &retry).await;
+    let retry = core.retry_installation(&vanilla).await.unwrap();
+    wait(&core, &retry).await;
+    let installed = core.store.lock().unwrap().instances().unwrap();
+    assert_eq!(installed.len(), 2);
+    assert!(installed.iter().all(|entry| entry.info.is_installed));
+    assert!(installed.iter().any(|entry| entry.info.id == instance));
+    assert!(
+        installed
+            .iter()
+            .any(|entry| entry.info.id == vanilla_instance)
+    );
 }
 
 #[cfg(feature = "desktop")]

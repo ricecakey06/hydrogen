@@ -39,6 +39,10 @@ pub fn modrinth_url(value: &str) -> bool {
         ],
     )
 }
+fn import_url(value: &str) -> bool {
+    modrinth_url(value) || curseforge::download_url(value)
+}
+
 struct Download {
     path: String,
     urls: Vec<String>,
@@ -215,7 +219,7 @@ pub async fn prepare(client: &Client, options: Prepare, job: &Job) -> Result<Val
             urls: file
                 .downloads
                 .iter()
-                .filter(|url| modrinth_url(url))
+                .filter(|url| import_url(url))
                 .cloned()
                 .collect(),
             sha1: file.hashes.get("sha1").cloned(),
@@ -389,4 +393,22 @@ pub async fn curse_matches(
         }
     }
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::import_url;
+
+    #[test]
+    fn modrinth_import_accepts_curseforge_cdn_downloads() {
+        for host in ["mediafilez.forgecdn.net", "edge.forgecdn.net"] {
+            assert!(import_url(&format!(
+                "https://{host}/files/6665/986/mod.jar"
+            )));
+        }
+        assert!(import_url("https://cdn.modrinth.com/data/mod.jar"));
+        assert!(!import_url("https://edge.forgecdn.net.example.com/mod.jar"));
+        assert!(!import_url("http://edge.forgecdn.net/mod.jar"));
+        assert!(!import_url("https://edge.forgecdn.net:8443/mod.jar"));
+    }
 }

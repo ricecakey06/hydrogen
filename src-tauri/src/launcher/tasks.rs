@@ -2,6 +2,7 @@ use crate::contracts::{ApiError, Result};
 use serde::Serialize;
 use std::{
     collections::{BTreeMap, BTreeSet},
+    path::PathBuf,
     sync::{Arc, Mutex},
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
@@ -52,10 +53,15 @@ impl Task {
     pub fn active(&self) -> bool {
         !["completed", "failed", "cancelled", "exited"].contains(&self.phase.as_str())
     }
+    fn retryable_installation(&self) -> bool {
+        matches!(self.phase.as_str(), "failed" | "cancelled")
+            && matches!(self.kind.as_str(), "install" | "modpackImport")
+    }
 }
 pub struct Job {
     pub state: Mutex<Task>,
     pub cancel: CancellationToken,
+    modpack_source: Option<PathBuf>,
     updated: Mutex<Instant>,
     downloads: Mutex<Downloads>,
 }
@@ -219,8 +225,24 @@ impl Job {
 }
 #[derive(Default)]
 pub struct Tasks(Mutex<BTreeMap<String, Arc<Job>>>);
+pub enum InstallationRetry {
+    Instance(String),
+    Modpack(PathBuf),
+}
 impl Tasks {
     pub fn start(&self, kind: &str, instance: Option<&str>) -> Result<Arc<Job>> {
+        self.start_job(kind, instance, None, None)
+    }
+    pub fn start_modpack_import(&self, source: PathBuf, retry: Option<&str>) -> Result<Arc<Job>> {
+        self.start_job("modpackImport", None, Some(source), retry)
+    }
+    fn start_job(
+        &self,
+        kind: &str,
+        instance: Option<&str>,
+        modpack_source: Option<PathBuf>,
+        retry: Option<&str>,
+    ) -> Result<Arc<Job>> {
         let mut tasks = self.0.lock().unwrap();
         if tasks.values().any(|j| {
             let state = j.state.lock().unwrap();
@@ -232,6 +254,18 @@ impl Tasks {
                 "TASK_BUSY",
                 "此实例或操作正在运行，请先等待完成。",
             ));
+        }
+        if let Some(id) = retry {
+            let previous = tasks.get(id).ok_or_else(unknown_task)?;
+            let state = previous.state.lock().unwrap();
+            if !state.retryable_installation()
+                || state.instance_id.is_some()
+                || previous.modpack_source != modpack_source
+            {
+                return Err(not_retryable());
+            }
+            drop(state);
+            tasks.remove(id);
         }
         if kind == "install" {
             tasks.retain(|_, job| {
@@ -274,11 +308,26 @@ impl Tasks {
                 download: None,
             }),
             cancel: CancellationToken::new(),
+            modpack_source,
             updated: Mutex::new(Instant::now()),
             downloads: Mutex::new(Downloads::default()),
         });
         tasks.insert(id, job.clone());
         Ok(job)
+    }
+    pub fn installation_retry(&self, id: &str) -> Result<InstallationRetry> {
+        let tasks = self.0.lock().unwrap();
+        let job = tasks.get(id).ok_or_else(unknown_task)?;
+        let state = job.state.lock().unwrap();
+        if state.retryable_installation() {
+            if let Some(id) = &state.instance_id {
+                return Ok(InstallationRetry::Instance(id.clone()));
+            }
+            if let Some(source) = &job.modpack_source {
+                return Ok(InstallationRetry::Modpack(source.clone()));
+            }
+        }
+        Err(not_retryable())
     }
     pub fn list(&self) -> Vec<Task> {
         let mut tasks: Vec<_> = self
@@ -306,9 +355,7 @@ impl Tasks {
     }
     pub fn cancel(&self, id: &str) -> Result<()> {
         let tasks = self.0.lock().unwrap();
-        let job = tasks
-            .get(id)
-            .ok_or_else(|| ApiError::new("UNKNOWN_TASK", "任务不存在。"))?;
+        let job = tasks.get(id).ok_or_else(unknown_task)?;
         let state = job.state.lock().unwrap();
         if ["starting", "running", "committing"].contains(&state.phase.as_str()) {
             return Err(ApiError::new(
@@ -326,4 +373,12 @@ impl Tasks {
             }
         }
     }
+}
+
+fn unknown_task() -> ApiError {
+    ApiError::new("UNKNOWN_TASK", "任务不存在。")
+}
+
+fn not_retryable() -> ApiError {
+    ApiError::new("TASK_NOT_RETRYABLE", "此安装任务无法重试。")
 }

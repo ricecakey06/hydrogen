@@ -43,6 +43,14 @@ fn repository(kind: &str, game: &str) -> Result<(&'static str, &'static str)> {
         _ => Err(invalid()),
     }
 }
+fn installer_version(artifact: &str, game: &str, loader: &str) -> String {
+    let prefix = format!("{game}-");
+    if artifact.ends_with(":forge") && !loader.starts_with(&prefix) {
+        format!("{prefix}{loader}")
+    } else {
+        loader.into()
+    }
+}
 fn neo_prefix(game: &str) -> Option<String> {
     let parts: Vec<_> = game.split('.').collect();
     let numbers: Vec<u32> = parts
@@ -608,10 +616,11 @@ pub async fn prepare(client: &Client, settings: &Settings, p: &Value, job: &Job)
     let game = text(p, "version")?;
     let kind = text(&p["components"], "kind")?;
     let loader = text(&p["components"], "loader")?;
-    if !token(loader) {
+    if !token(loader) || !token(game) {
         return Err(invalid());
     }
     let (repo, artifact_name) = repository(kind, game)?;
+    let loader = installer_version(artifact_name, game, loader);
     let coordinate = format!("{artifact_name}:{loader}:installer");
     let url = format!("{repo}/{}", maven_path(&coordinate)?);
     let hash_path = storage::within(root, &format!("cache/installers/{kind}-{loader}.jar.sha1"))?;
@@ -725,6 +734,25 @@ pub async fn prepare(client: &Client, settings: &Settings, p: &Value, job: &Job)
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn forge_installer_accepts_short_modpack_loader_versions() {
+        for (kind, game, short, full) in [
+            ("forge", "1.20.1", "47.4.16", "1.20.1-47.4.16"),
+            (
+                "forge",
+                "1.7.10",
+                "10.13.4.1614-1.7.10",
+                "1.7.10-10.13.4.1614-1.7.10",
+            ),
+            ("neoforge", "1.20.1", "47.1.5", "1.20.1-47.1.5"),
+            ("neoforge", "1.21.1", "21.1.172", "21.1.172"),
+        ] {
+            let (_, artifact) = repository(kind, game).unwrap();
+            assert_eq!(installer_version(artifact, game, short), full);
+            assert_eq!(installer_version(artifact, game, full), full);
+        }
+    }
+
     #[test]
     fn coordinates_and_processor_substitutions() {
         let root = Path::new("repository");
