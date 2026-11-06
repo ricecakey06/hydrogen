@@ -26,6 +26,7 @@ pub fn trusted(url: &Url) -> bool {
                 "repo1.maven.org",
                 "libraries.optifine.net",
                 "api.modrinth.com",
+                "mod.mcimirror.top",
                 "cdn.modrinth.com",
                 "cdn.jsdelivr.net",
                 "raw.githubusercontent.com",
@@ -50,6 +51,20 @@ pub fn trusted(url: &Url) -> bool {
                 || h.ends_with(".bmclapi.com")
                 || h.ends_with(".bmclapi.cn")
         })
+}
+pub fn mod_api_mirror(url: &Url) -> Option<Url> {
+    if !trusted(url) {
+        return None;
+    }
+    let prefix = match url.host_str()? {
+        "api.modrinth.com" => "/modrinth",
+        "api.curseforge.com" => "/curseforge",
+        _ => return None,
+    };
+    let mut mirror = url.clone();
+    mirror.set_host(Some("mod.mcimirror.top")).ok()?;
+    mirror.set_path(&format!("{prefix}{}", url.path()));
+    Some(mirror)
 }
 pub fn client() -> Result<Client> {
     Client::builder()

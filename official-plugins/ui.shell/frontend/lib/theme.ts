@@ -6,6 +6,7 @@ export interface ThemeEntry { id: string; title: string; pluginId: string | null
 export interface ThemeVisual {
   token: string; choice: ThemeChoice; actualId: string; scheme: 'light' | 'dark'; highContrast: boolean;
   packageDigest: string | null; fallbackReason: string | null; styles: string[]; logo: string | null;
+  instanceIcons?: Partial<Record<'vanilla' | 'forge' | 'neoforge' | 'fabric', string>>;
   layers: { id: string; slot: string; source: string }[]; images: string[]; fonts: string[]; fontSources: string[];
   bytes: number; decodedBytes: number;
 }

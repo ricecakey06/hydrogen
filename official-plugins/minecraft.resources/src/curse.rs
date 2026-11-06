@@ -3,7 +3,7 @@ use hydrogen_plugin_services::{
     contracts::Result,
     curseforge::{self as api, CurseFile},
     http::Client,
-    jobs::Job,
+    jobs::{Job, service_task},
     net, storage, text,
 };
 use serde::Deserialize;
@@ -452,7 +452,7 @@ async fn download(client: &Client, key: &str, params: &Value, job: &Job) -> Resu
     let mut result = Vec::new();
     for file in files {
         let cache = storage::within(root, &format!("cache/curseforge-mod-downloads/{}", file.id))?;
-        let path = net::ensure_game_file(
+        let mut path = net::ensure_game_file(
             client,
             &cache,
             &file.file_name,
@@ -465,8 +465,16 @@ async fn download(client: &Client, key: &str, params: &Value, job: &Job) -> Resu
         )
         .await?;
         if file.sha1().is_none() && api::fingerprint(&path, job).await? != file.file_fingerprint {
-            fs::remove_file(path)?;
-            return Err(invalid("CurseForge 模组校验失败。"));
+            fs::remove_file(&path)?;
+            path = serde_json::from_value(service_task(
+                "minecraft.download", "once",
+                json!({"root":cache,"relative":file.file_name,"url":file.url()?,"size":file.file_length}),
+                job,
+            ).await?)?;
+            if api::fingerprint(&path, job).await? != file.file_fingerprint {
+                fs::remove_file(path)?;
+                return Err(invalid("CurseForge 模组校验失败。"));
+            }
         }
         result.push(path);
     }
@@ -474,7 +482,7 @@ async fn download(client: &Client, key: &str, params: &Value, job: &Job) -> Resu
 }
 
 pub async fn call(client: &Client, method: &str, params: &Value, job: &Job) -> Result<Value> {
-    let key = api::api_key().ok_or_else(api::missing_key)?;
+    let key = api::api_key().unwrap_or_default();
     match method {
         "filters" => filters(client, &key).await,
         "search" => search(client, &key, params).await,

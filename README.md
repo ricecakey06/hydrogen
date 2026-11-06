@@ -17,7 +17,7 @@
 
 </div>
 
-Hydrogen 使用插件提供界面、账号和游戏管理等功能。当前版本为 **a0.2.7**。
+Hydrogen 使用插件提供界面、账号和游戏管理等功能。当前版本为 **0.2.12**。
 
 项目仍在开发中，主要由 AI 编写，长期可用性和稳定性仍需持续验证。
 
@@ -40,6 +40,8 @@ Hydrogen 使用插件提供界面、账号和游戏管理等功能。当前版�
 ## 下载与使用
 
 从 [Releases](https://github.com/ricecakey06/hydrogen/releases) 下载 `Launcher.exe`，放入具有写入权限的独立目录后运行。发布页的 `SHA256SUMS.txt` 用于核对文件摘要；未发布的构建可从 [Actions](https://github.com/ricecakey06/hydrogen/actions/workflows/ci.yml) 下载 `Hydrogen-win-x64` 产物。
+
+Release 由维护者手动发布。CI 负责构建、测试并保存 Windows 产物；发布时由维护者选择提交和版本标签、填写说明并上传 `Launcher.exe` 与 `SHA256SUMS.txt`。
 
 ### 首次启动
 

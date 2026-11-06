@@ -63,6 +63,23 @@ Launcher.exe --data-dir ./theme-test-data --dev-plugin ./my-theme
 
 `scheme` 必须与清单键一致，`extends` 只能使用相同 scheme 的固定内置基础。`styles` 按声明顺序覆盖内置语义变量；`panelStyles` 仅进入隔离 HTML 面板。未声明 logo 时显示内置字标，声明后替换整份可见品牌。图层为宿主创建的非交互图片，槽位见 [公共契约](../THEME-CONTRACT.md)。单张合成背景直接写在 CSS 中即可。
 
+## 实例图标
+
+版本选择页先显示整合包/实例的自定义图标；没有可用的自定义图标时，使用当前变体的 `instanceIcons`，最后使用内置图标（原版草方块、Forge 铁砧、NeoForge 与 Fabric 官方 Logo）。可在浅色、深色变体中分别指定，未指定的类型保留内置图标：
+
+```json
+"instanceIcons": {
+  "vanilla": {"source": "assets/grass.png"},
+  "forge": {"source": "assets/anvil.png"},
+  "neoforge": {"source": "assets/neoforge.png"},
+  "fabric": {"source": "assets/fabric.png"}
+}
+```
+
+资源路径相对变体 JSON，只接受静态 PNG/JPEG/WebP，单张最多 2 MiB、边长 1600，并计入变体图片预算。它们与主题一起准备、预览、撤销和释放。主题不能替换整合包自身的图标。可用 `[data-h-part="instance-icon"]` 调整图标显示尺寸。
+
+导入 `.mrpack` / CurseForge `.zip` 时，会保存包根目录的 `icon`、`pack`、`logo` 图片（PNG/JPEG/WebP）。实例目录也支持 `.hydrogen/instance-icon.<扩展名>`、`PCL/Logo.png` 及根目录的 `icon`、`pack`、`logo` 图片；损坏、超限或链接文件会被跳过，继续使用下一个可用图标。图标只从对应版本目录读取，无需修改实例配置。
+
 ## CSS 写法
 
 ```css
@@ -101,7 +118,7 @@ Launcher.exe --data-dir ./theme-test-data --dev-plugin ./my-theme
 | 单个变体 JSON | 64 KiB |
 | 图层 | 12 个；图层 ID 唯一 |
 | 图片 | 静态 PNG/JPEG/WebP，最多 32 张，每张 8 MiB，边长 4096、像素 800 万 |
-| logo / 预览 | 2 MiB、边长 1600 |
+| logo / 预览 / 实例图标 | 2 MiB、边长 1600 |
 | 字体 | WOFF2，最多 2 个，每个 4 MiB，声明展开尺寸最多 32 MiB |
 | 每包主题源码及资源 | 32 MiB |
 | 单变体图片解码 | 64 MiB；切换解码峰值 128 MiB |

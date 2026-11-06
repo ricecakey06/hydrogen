@@ -58,6 +58,8 @@ pub struct Settings {
     pub after_launch: String,
     pub jvm_arguments: String,
     pub download_source: String,
+    #[serde(default = "default_mod_mirror")]
+    pub use_mod_mirror: bool,
     // Retained for existing configuration files; availability follows the plugin state.
     pub offline_enabled: bool,
     pub offline_player_name: String,
@@ -67,6 +69,9 @@ pub struct Settings {
 }
 fn default_locale() -> String {
     "zh-CN".into()
+}
+fn default_mod_mirror() -> bool {
+    true
 }
 fn allows(
     client: &Client,

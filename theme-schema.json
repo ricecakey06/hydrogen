@@ -20,6 +20,10 @@
     "styles": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "type": "string" } },
     "panelStyles": { "type": "array", "maxItems": 8, "items": { "type": "string" } },
     "branding": { "type": "object", "additionalProperties": false, "properties": { "logo": { "oneOf": [{ "$ref": "#/$defs/asset" }, { "type": "null" }] } } },
+    "instanceIcons": { "type": "object", "additionalProperties": false, "properties": {
+      "vanilla": { "$ref": "#/$defs/asset" }, "forge": { "$ref": "#/$defs/asset" },
+      "neoforge": { "$ref": "#/$defs/asset" }, "fabric": { "$ref": "#/$defs/asset" }
+    } },
     "layers": { "type": "array", "maxItems": 12, "items": { "type": "object", "additionalProperties": false, "required": ["id", "slot", "source"], "properties": { "id": { "type": "string" }, "source": { "type": "string" }, "slot": { "enum": ["window.background", "content.background", "sidebar.background", "titlebar.decoration", "sidebar.decoration", "content.decoration"] } } } }
   }
 }

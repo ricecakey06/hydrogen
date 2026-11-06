@@ -45,6 +45,8 @@ struct Variant {
     #[serde(default)]
     branding: Branding,
     #[serde(default)]
+    instance_icons: BTreeMap<String, Asset>,
+    #[serde(default)]
     layers: Vec<Layer>,
 }
 #[derive(Debug, Default, Deserialize)]
@@ -232,7 +234,11 @@ impl<'a> Assets<'a> {
         format!("{}/@theme/{}/{}", ui_origin(), self.token, id)
     }
 }
-fn validate_image(bytes: &[u8], path: &Path, small: bool) -> Result<(&'static str, u64)> {
+pub(crate) fn validate_image(
+    bytes: &[u8],
+    path: &Path,
+    small: bool,
+) -> Result<(&'static str, u64)> {
     let format = image::guess_format(bytes)
         .map_err(|_| ApiError::new("THEME_RESOURCE", "无法识别图片内容。"))?;
     let (extension, mime) = match format {
@@ -319,6 +325,7 @@ pub struct Prepared {
     pub fallback_reason: Option<String>,
     pub styles: Vec<String>,
     pub logo: Option<String>,
+    pub instance_icons: BTreeMap<String, String>,
     pub layers: Vec<VisualLayer>,
     pub images: Vec<String>,
     pub fonts: Vec<String>,
@@ -364,6 +371,7 @@ fn build(
         fallback_reason: fallback,
         styles: vec![format!("{}/@theme/{token}/main.css", ui_origin())],
         logo: None,
+        instance_icons: BTreeMap::new(),
         layers: vec![],
         images: vec![],
         fonts: vec![],
@@ -462,6 +470,19 @@ fn build(
                 return Err(ApiError::new("THEME_RESOURCE", "logo 必须为图片。"));
             }
             visual.logo = Some(assets.url(&id));
+        }
+        for (kind, icon) in variant.instance_icons {
+            if !["vanilla", "forge", "neoforge", "fabric"].contains(&kind.as_str()) {
+                return Err(ApiError::new(
+                    "THEME_INVALID",
+                    format!("{file}: 未知实例图标类型 {kind}。"),
+                ));
+            }
+            let id = assets.read(file, &icon.source, true)?;
+            if !assets.resources[&id].mime.starts_with("image/") {
+                return Err(ApiError::new("THEME_RESOURCE", "实例图标必须为图片。"));
+            }
+            visual.instance_icons.insert(kind, assets.url(&id));
         }
         let mut ids = BTreeSet::new();
         let contract: serde_json::Value = serde_json::from_str(CONTRACT).unwrap();
@@ -1082,6 +1103,57 @@ pub fn self_test(host: &PluginHost, plugin: &Plugin) -> Result<serde_json::Value
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn instance_icons_are_validated_and_captured_in_theme_resources() {
+        let directory = tempfile::tempdir().unwrap();
+        write_template(directory.path()).unwrap();
+        let file = directory.path().join("themes/light.json");
+        let mut json: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+        for kind in ["vanilla", "forge", "neoforge", "fabric"] {
+            image::DynamicImage::new_rgba8(8, 8)
+                .save(directory.path().join(format!("themes/{kind}.png")))
+                .unwrap();
+            json["instanceIcons"][kind] = serde_json::json!({"source":format!("{kind}.png")});
+        }
+        std::fs::write(&file, serde_json::to_vec(&json).unwrap()).unwrap();
+        let plugin = manifest::load(directory.path()).unwrap();
+        let snapshot = build(
+            Some(&plugin),
+            Some(&plugin.manifest.contributes.themes[0]),
+            Choice::default(),
+            "light",
+            false,
+            None,
+        )
+        .unwrap();
+        assert_eq!(snapshot.visual.instance_icons.len(), 4);
+        for url in snapshot.visual.instance_icons.values() {
+            assert!(snapshot.visual.images.contains(url));
+            let id = url.rsplit('/').next().unwrap();
+            assert_eq!(snapshot.resources[id].mime, "image/png");
+            let saved = snapshot.resources[id].bytes.clone();
+            std::fs::write(directory.path().join("themes/fabric.png"), b"changed").unwrap();
+            assert_eq!(&*snapshot.resources[id].bytes, &*saved);
+        }
+        assert!(
+            build(None, None, Choice::default(), "dark", false, None)
+                .unwrap()
+                .visual
+                .instance_icons
+                .is_empty()
+        );
+        for value in [
+            serde_json::json!({"unknown":{"source":"vanilla.png"}}),
+            serde_json::json!({"fabric":{"source":"https://fabricmc.net/logo.png"}}),
+            serde_json::json!({"fabric":{"source":"fabric.png"}}),
+        ] {
+            json["instanceIcons"] = value;
+            std::fs::write(&file, serde_json::to_vec(&json).unwrap()).unwrap();
+            assert!(manifest::load(directory.path()).is_err());
+        }
+    }
+
     fn insert(themes: &Themes, scheme: &str) -> String {
         let snapshot = build(None, None, Choice::default(), scheme, false, None).unwrap();
         let token = snapshot.visual.token.clone();

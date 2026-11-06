@@ -43,7 +43,7 @@
 
 ## 公共部位和状态
 
-- **parts**：`titlebar`、`brand`、`brand-image`、`sidebar`、`nav-item`、`content`、`page`、`page-heading`、`card`、`button`、`input-shell`
+- **parts**：`titlebar`、`brand`、`brand-image`、`instance-icon`、`sidebar`、`nav-item`、`content`、`page`、`page-heading`、`card`、`button`、`input-shell`
 - **variants**：`primary`、`launch`、`danger`、`secondary`、`icon`
 - **scopes**：`popup`
 - **pages**：`home`、`versions`、`instance`、`profiles`、`settings`、`downloads`、`crash`、`resources`、`plugin`

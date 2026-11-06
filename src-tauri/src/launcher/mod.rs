@@ -6,6 +6,7 @@ pub mod credentials;
 pub mod diagnostics;
 pub mod environment;
 pub mod http;
+pub mod instance_icons;
 pub mod java;
 #[cfg(feature = "desktop")]
 pub mod launch;

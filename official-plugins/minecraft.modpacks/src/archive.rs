@@ -367,6 +367,31 @@ impl Pack {
         })
     }
 
+    pub fn icons(&self, zip: &mut ZipArchive<File>) -> Result<Vec<Override>> {
+        let mut icons = BTreeMap::new();
+        for index in 0..zip.len() {
+            let entry = zip.by_index_raw(index).map_err(zip_error)?;
+            let name = entry.name().to_ascii_lowercase();
+            let Some((stem, ext)) = name.rsplit_once('.') else {
+                continue;
+            };
+            if !["icon", "pack", "logo"].contains(&stem)
+                || !["png", "jpg", "jpeg", "webp"].contains(&ext)
+                || entry.is_dir()
+                || entry.is_symlink()
+                || entry.size() > 2 * 1024 * 1024
+            {
+                continue;
+            }
+            icons.entry(name.clone()).or_insert(Override {
+                path: format!(".hydrogen/instance-icon/{name}"),
+                index,
+                size: entry.size(),
+            });
+        }
+        Ok(icons.into_values().collect())
+    }
+
     pub fn overrides(
         &self,
         zip: &mut ZipArchive<File>,

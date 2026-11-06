@@ -3,6 +3,7 @@
   import { tick } from 'svelte';
   import { t } from '../../../ui.shell/frontend/lib/i18n';
   import Icon from '../../../ui.shell/frontend/components/Icon.svelte';
+  import InstanceIcon from '../components/InstanceIcon.svelte';
   import { action, errorMessage, taskActive, type Snapshot, type GameVersion } from '../../../ui.shell/frontend/lib/api';
   import { entrance } from '../../../ui.shell/frontend/lib/motion';
   // Keep selection primary within each row, with neutral 44px settings/launch actions (§2.8, §3.2).
@@ -83,6 +84,7 @@
         <PluginContextMenu {snapshot} location="instance.contextMenu" context={{ instanceId: instance.id }} {onchange}>
         <div class="instance-row">
           <button data-h-part="button" class="instance-card" disabled={!instance.isInstalled} aria-pressed={snapshot?.selectedInstanceId === instance.id} onclick={() => onselect(instance.id)}>
+            <InstanceIcon {instance} custom={snapshot?.instanceIcons?.[instance.id]} />
             <span class="instance-text"><span class="instance-name">{instance.name}</span><span class="instance-version">{instance.gameVersion} · {instance.loaderName || (instance.components ? 'Fabric' : t("原版"))} · {instance.isInstalled ? t("已安装") : t("安装未完成")}</span></span>
             {#if snapshot?.selectedInstanceId === instance.id}<span class="current-instance">{t("当前实例")}</span>{/if}
           </button>

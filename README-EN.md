@@ -16,7 +16,7 @@ A simple interface · Everything is a plugin
 
 </div>
 
-Hydrogen uses plugins to provide its interface, account management and game management features. The current version is **a0.2.7**.
+Hydrogen uses plugins to provide its interface, account management and game management features. The current version is **0.2.12**.
 
 The project is under development and primarily written with AI. Long-term usability and stability still require ongoing validation.
 
@@ -39,6 +39,8 @@ The launcher uses system WebView2 and does not automatically install WebView2 or
 ## Download and usage
 
 Download `Launcher.exe` from [Releases](https://github.com/ricecakey06/hydrogen/releases), place it in a separate writable directory, and run it. Use `SHA256SUMS.txt` on the release page to verify the file. Unreleased builds are available as `Hydrogen-win-x64` artifacts in [Actions](https://github.com/ricecakey06/hydrogen/actions/workflows/ci.yml).
+
+Maintainers publish releases manually. CI builds, tests and retains the Windows artifacts; maintainers choose the commit and version tag, write the release notes, and upload `Launcher.exe` and `SHA256SUMS.txt` when publishing.
 
 ### First launch
 

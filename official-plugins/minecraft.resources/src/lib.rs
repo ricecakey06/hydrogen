@@ -559,7 +559,17 @@ async fn external_download(_client: &Client, params: &Value, job: &Job) -> Resul
     for file in plan {
         job.check()?;
         let cache = storage::within(root, &format!("cache/provider-downloads/{}", file.sha1))?;
-        let path=hydrogen_plugin_services::jobs::service_task("minecraft.download","once",json!({"root":cache,"relative":file.filename,"url":file.url,"hash":file.sha1,"size":file.size}),job).await?;
+        let method = if Url::parse(&file.url).is_ok_and(|url| {
+            matches!(
+                url.host_str(),
+                Some("cdn.modrinth.com" | "edge.forgecdn.net" | "mod.mcimirror.top")
+            )
+        }) {
+            "transfer"
+        } else {
+            "once"
+        };
+        let path=hydrogen_plugin_services::jobs::service_task("minecraft.download",method,json!({"root":cache,"relative":file.filename,"url":file.url,"hash":file.sha1,"size":file.size}),job).await?;
         paths.push(serde_json::from_value::<PathBuf>(path)?);
     }
     Ok(json!(paths))

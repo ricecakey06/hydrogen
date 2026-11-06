@@ -47,6 +47,7 @@ impl State {
                 let hash = p["hash"].as_str().map(String::from);
                 let size = p["size"].as_u64();
                 let mirror = p["mirror"] == true;
+                let mod_mirror = p["modMirror"] != false;
                 let client = Client::new(&PluginHost, &Settings::default())?;
                 let job = Arc::new(Job::default());
                 let progress = job.clone();
@@ -71,6 +72,7 @@ impl State {
                             hash.as_deref(),
                             size,
                             mirror,
+                            mod_mirror,
                             &job,
                         )
                         .await?

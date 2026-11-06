@@ -7,6 +7,7 @@
   import { t, i18n } from '../../../ui.shell/frontend/lib/i18n';
   import { action, errorMessage, instanceLoaderLabel, taskActive, type InstanceInfo, type Snapshot, type Settings, type JavaRuntime } from '../../../ui.shell/frontend/lib/api';
   import Icon from '../../../ui.shell/frontend/components/Icon.svelte';
+  import InstanceIcon from '../components/InstanceIcon.svelte';
   import PluginPanel from '../../../ui.shell/frontend/components/PluginPanel.svelte';
   import PluginSlot from '../../../ui.shell/frontend/components/PluginSlot.svelte';
   import { contributions, uiState } from '../../../ui.shell/frontend/lib/contributions';
@@ -30,6 +31,7 @@
   const legacyImport = $derived(snapshot?.tasks.find(task => task.kind === 'legacyImport'));
   let instanceName = $state('');
   let source = $state('official');
+  let useModMirror = $state(true);
   let java = $state('');
   let memory = $state(4096);
   let inheritMemory = $state(true);
@@ -56,6 +58,7 @@
     jvm = instance?.overrides.jvmArguments ?? settings.jvmArguments; inheritJvm = instance?.overrides.jvmArguments == null;
     isolation = settings.isolateGameDirectory == null ? 'auto' : settings.isolateGameDirectory ? 'isolated' : 'shared';
     source = settings.downloadSource; windowMode = settings.windowMode; windowWidth = settings.windowWidth; windowHeight = settings.windowHeight; afterLaunch = settings.afterLaunch;
+    useModMirror = settings.useModMirror ?? true;
     error = ''; message = '';
   });
   $effect(() => {
@@ -88,7 +91,7 @@
     if (!snapshot) return; busy = true; error = ''; message = '';
     try {
       if (instance) { await action('saveOverrides', { id: instance.id, overrides: { java: java || null, maxMemoryMib: inheritMemory ? null : Number(memory), jvmArguments: inheritJvm ? null : jvm } }); }
-      else { const settings: Settings = { ...snapshot.settings, locale: languageAvailable ? locale : snapshot.settings.locale, isolateGameDirectory: isolation === 'auto' ? null : isolation === 'isolated', java: java || null, maxMemoryMib: Number(memory), jvmArguments: jvm, downloadSource: source, windowMode, windowWidth: Number(windowWidth), windowHeight: Number(windowHeight), afterLaunch }; await action('saveSettings', { settings }); }
+      else { const settings: Settings = { ...snapshot.settings, locale: languageAvailable ? locale : snapshot.settings.locale, isolateGameDirectory: isolation === 'auto' ? null : isolation === 'isolated', java: java || null, maxMemoryMib: Number(memory), jvmArguments: jvm, downloadSource: source, useModMirror, windowMode, windowWidth: Number(windowWidth), windowHeight: Number(windowHeight), afterLaunch }; await action('saveSettings', { settings }); }
       await onchange(); message = t("设置已保存");
     } catch (e) { error = errorMessage(e); } finally { busy = false; }
   }
@@ -100,7 +103,7 @@
   {#if instance}
     <div class="instance-header">
       <section class="instance-overview" aria-labelledby="instance-overview-title">
-        <span class="instance-emblem"><Icon name="cube" size={29} width={1.6} /></span>
+        <span class="instance-emblem"><InstanceIcon {instance} custom={snapshot?.instanceIcons?.[instance.id]} /></span>
         <div class="instance-identity">
           <h2 id="instance-overview-title" title={instance.name}>{instance.name}</h2>
           <p>Minecraft {instance.gameVersion} <span aria-hidden="true">·</span> {instanceLoaderLabel(instance)}</p>
@@ -183,6 +186,8 @@
       <label class="section-label" for="download-source">{t("游戏下载源")}</label>
       <select data-h-part="input-shell" id="download-source" bind:value={source}>{#each snapshot?.plugins.filter(p => p.enabled && !p.problem) ?? [] as plugin}{#each (plugin.providers ?? []).filter(p => p.kind === 'downloadSource') as provider}<option value={plugin.id === 'minecraft.download' ? provider.id : plugin.id + ':' + provider.id}>{provider.title}</option>{/each}{/each}</select>
       <p class="caption">{t("保存后用于新的下载请求。")}</p>
+      <label class="section-label checkbox-row"><input data-h-part="input-shell" type="checkbox" bind:checked={useModMirror} disabled={busy} aria-describedby="mod-mirror-note" />{t("使用国内镜像下载模组")}</label>
+      <p id="mod-mirror-note" class="caption">{t("默认启用 MCIM，镜像失败后自动回退源站；关闭后模组查询与下载统一使用源站。保存后用于新的请求。")}</p>
       {@render javaEditor()}
       {@render memoryEditor()}
       <label class="section-label" for="game-window">{t("游戏窗口")}</label>

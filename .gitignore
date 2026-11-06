@@ -4,9 +4,7 @@ dist/
 **/target/
 src-tauri/gen/
 artifacts/
-official-plugins/ui.shell/assets/
-official-plugins/ui.launcher/assets/
-official-plugins/plugins.manager/assets/
+scripts/
 
 # Local launcher and game data
 HydrogenTauriData/

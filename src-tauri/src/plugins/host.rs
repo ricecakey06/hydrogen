@@ -286,7 +286,25 @@ impl PluginHost {
         let plugin = self.service_plugin(settings, provider, service, method)?;
         path.push(provider.into());
         let mut effective_method = method;
-        if provider == "minecraft.download" {
+        if matches!(provider, "network" | "minecraft.download") {
+            params.0["modMirror"] = Value::Bool(settings.use_mod_mirror);
+        }
+        let mod_file = params.0["url"].as_str().is_some_and(|value| {
+            reqwest::Url::parse(value).is_ok_and(|url| {
+                matches!(
+                    url.host_str(),
+                    Some(
+                        "cdn.modrinth.com"
+                            | "edge.forgecdn.net"
+                            | "mediafilez.forgecdn.net"
+                            | "media.forgecdn.net"
+                            | "mediafiles.forgecdn.net"
+                            | "mod.mcimirror.top"
+                    )
+                )
+            })
+        });
+        if provider == "minecraft.download" && !mod_file {
             if let Some(id) = settings.download_source.strip_prefix("minecraft.download:") {
                 params.0["mirror"] = Value::Bool(id == "bmclapi");
             } else if settings.download_source.contains(':')

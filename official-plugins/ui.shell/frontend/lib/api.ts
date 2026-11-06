@@ -10,7 +10,7 @@ export function instanceLoaderLabel(instance: InstanceInfo) {
   const name = instance.loaderName || ({ fabric: 'Fabric', forge: 'Forge', neoforge: 'NeoForge', quilt: 'Quilt' } as Record<string,string>)[components.kind ?? 'fabric'] || components.kind;
   return [name, components.loader].filter(Boolean).join(' ');
 }
-export interface Settings { theme: { id: string; mode: 'light' | 'dark' | 'system'; material: 'auto' | 'opaque' }; locale: string; gameDirectory: string | null; isolateGameDirectory: boolean | null; java: string | null; maxMemoryMib: number; windowMode: string; windowWidth: number; windowHeight: number; afterLaunch: string; jvmArguments: string; downloadSource: string; offlineEnabled: boolean; offlinePlayerName: string; accountMode: string; microsoftClientId: string; modules: Record<string, boolean> }
+export interface Settings { theme: { id: string; mode: 'light' | 'dark' | 'system'; material: 'auto' | 'opaque' }; locale: string; gameDirectory: string | null; isolateGameDirectory: boolean | null; java: string | null; maxMemoryMib: number; windowMode: string; windowWidth: number; windowHeight: number; afterLaunch: string; jvmArguments: string; downloadSource: string; useModMirror: boolean; offlineEnabled: boolean; offlinePlayerName: string; accountMode: string; microsoftClientId: string; modules: Record<string, boolean> }
 export interface JavaRuntime { path: string; version: string; major: number; architecture: string }
 export interface DownloadProgress { completed: number; total: number | null; completedFiles: number; totalFiles: number; activeFiles: string[] }
 export interface CrashCause { id: string; title: string; summary: string; suggestions: string[]; evidence: string[] }
@@ -32,7 +32,7 @@ export interface PluginInfo {
   runtime: 'javascript' | 'native';
   description: string; origin: 'builtIn' | 'development' | 'installed'; required: boolean; enabled: boolean; problem: string; dependencies: (string | { id: string; version?: string })[];
 }
-export interface Snapshot { stage: string; version: string; instances: InstanceInfo[]; selectedInstanceId: string; settings: Settings; javaRuntimes: JavaRuntime[]; account: Account; tasks: Task[]; dataDirectory: string; gameDirectory: string; notice: string | null; readOnly: boolean; memory: { totalMib: number; recommendedMib: number }; plugins: PluginInfo[]; webviewVersion: string; appearance: { material: 'blur' | 'solid'; reason: string; rounded: boolean } }
+export interface Snapshot { stage: string; version: string; instances: InstanceInfo[]; instanceIcons?: Record<string, string>; selectedInstanceId: string; settings: Settings; javaRuntimes: JavaRuntime[]; account: Account; tasks: Task[]; dataDirectory: string; gameDirectory: string; notice: string | null; readOnly: boolean; memory: { totalMib: number; recommendedMib: number }; plugins: PluginInfo[]; webviewVersion: string; appearance: { material: 'blur' | 'solid'; reason: string; rounded: boolean } }
 export function action<T = void>(type: string, fields: Record<string, unknown> = {}): Promise<T> { return invoke<T>('launcher_action', { action: { type, ...fields } }); }
 export function taskActive(task: Task) { return !['completed', 'failed', 'cancelled', 'exited'].includes(task.phase); }
 export interface RunReport { pluginId: string; generation: number; result: unknown; notifications: string[]; heapBytes: number; registrations: number }

@@ -1,0 +1,22 @@
+Minecraft Grass Block Inventory Icon
+
+Copyright Mojang Studios. All rights reserved.
+
+Source file: Invicon_Grass_Block.png (32 x 32 pixels)
+Source page: https://minecraft.wiki/w/File:Invicon_Grass_Block.png
+Image URL: https://minecraft.wiki/images/Invicon_Grass_Block.png?a5d1f&format=original
+Current image revision at download: 19:29, 15 October 2023
+Downloaded: 6 November 2026
+Changes: none; the launcher scales the icon for display.
+
+The source file page identifies this image as a Mojang Studios asset:
+"This file (or parts of it) is copyright Mojang Studios."
+"Though copyrighted, this screenshot, texture, audio, song, or other Mojang asset,
+or derivative of Mojang assets, is freely usable on this wiki."
+
+Minecraft EULA: https://www.minecraft.net/eula
+Minecraft Usage Guidelines: https://www.minecraft.net/usage-guidelines
+
+The underlying Mojang artwork is not covered by Hydrogen's MIT license or the
+wiki's general Creative Commons license. This notice preserves the asset's
+source and copyright information.

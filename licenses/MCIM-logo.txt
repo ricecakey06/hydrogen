@@ -1,0 +1,11 @@
+MCIM Logo
+
+Project website: https://www.mcimirror.top/
+Source: logo-mark-192.png, supplied by the user on 6 November 2026.
+Bundled asset: official-plugins/ui.launcher/frontend/assets/mcim-logo.png
+Changes: none; displayed at a smaller size in the MCIM acknowledgement.
+
+Copyright remains with the artwork's respective rights holders.
+This logo is used to identify MCIM in the acknowledgements. It is not covered
+by Hydrogen's MIT license. This notice records its source and does not grant
+additional rights to the artwork.

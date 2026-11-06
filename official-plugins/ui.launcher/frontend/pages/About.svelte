@@ -7,6 +7,7 @@
   import launcherIcon from '../../../../src-tauri/icons/icon.png';
   import developerAvatar from './developer-avatar.jpg';
   import bangbang93Avatar from './bangbang93-avatar.webp';
+  import mcimIcon from '../assets/mcim-logo.png';
 
   type Update = { status: 'available'; version: string } | { status: 'upToDate' | 'noRelease' };
   type Notice = { name: string; version: string; ecosystem: string; license: string; texts: number[] };
@@ -15,6 +16,7 @@
   const links = {
     developer: 'https://space.bilibili.com/365980549',
     bmclapi: 'https://www.bangbang93.com/',
+    mcim: 'https://www.mcimirror.top/',
     releases: 'https://github.com/ricecakey06/hydrogen/releases/latest',
     miSansLicense: 'https://hyperos.mi.com/font-download/MiSans字体知识产权许可协议.pdf',
   };
@@ -103,6 +105,14 @@
         <a class="caption" href={links.bmclapi} onclick={event => openLink(event, 'bmclapi')}>{t("访问网站")}</a>
       </div>
     </div>
+    <div class="about-person mcim-credit">
+      <img src={mcimIcon} width="48" height="48" alt="" />
+      <div>
+        <strong>MCIM</strong>
+        <p class="caption">{t("为启动器提供 Modrinth 与 CurseForge 国内镜像")}</p>
+        <a class="caption" href={links.mcim} onclick={event => openLink(event, 'mcim')}>{t("访问网站")}</a>
+      </div>
+    </div>
   </section>
   {#if linkError}<p class="issue" role="alert">{linkError}</p>{/if}
 
@@ -156,6 +166,8 @@
   .about-person img { flex: none; border-radius: 50%; object-fit: cover; }
   .about-person strong { font-weight: 600; }
   .about-person .caption { margin-top: 2px; }
+  .mcim-credit { margin-top: 8px; }
+  .mcim-credit img { border-radius: 0; object-fit: contain; image-rendering: pixelated; }
   a { color: inherit; text-underline-offset: 2px; }
   a:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
   details + details { margin-top: 8px; }

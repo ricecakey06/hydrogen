@@ -118,7 +118,7 @@ svg { display: block; flex-shrink: 0; }
 .instances-list { flex: 1; padding: 2px 6px 0 2px; }
 .instance-row { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
 .instance-card { height: 64px; min-width: 0; flex: 1; display: flex; align-items: center; justify-content: space-between; text-align: left; gap: 12px; }
-.instance-text { min-width: 0; }
+.instance-text { min-width: 0; flex: 1; }
 .instance-name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: calc(var(--h-font-size,16px) * 1.125); }
 .instance-version { display: block; margin-top: 3px; font-size: calc(var(--h-font-size,16px) * 0.8125); color: var(--secondary); }
 .current-instance { font-size: calc(var(--h-font-size,16px) * 0.875); color: var(--secondary); flex-shrink: 0; }

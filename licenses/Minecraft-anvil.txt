@@ -1,0 +1,22 @@
+Minecraft Anvil Inventory Icon
+
+Copyright Mojang Studios. All rights reserved.
+
+Source file: Invicon_Anvil.png (32 x 32 pixels)
+Source page: https://minecraft.wiki/w/File:Invicon_Anvil.png
+Image URL: https://minecraft.wiki/images/Invicon_Anvil.png?0e685
+Current image revision at download: 19:18, 15 October 2023
+Downloaded: 6 November 2026
+Changes: none; the launcher scales the icon for display.
+
+The source file page identifies this image as a Mojang Studios asset:
+"This file (or parts of it) is copyright Mojang Studios."
+"Though copyrighted, this screenshot, texture, audio, song, or other Mojang asset,
+or derivative of Mojang assets, is freely usable on this wiki."
+
+Minecraft EULA: https://www.minecraft.net/eula
+Minecraft Usage Guidelines: https://www.minecraft.net/usage-guidelines
+
+The underlying Mojang artwork is not covered by Hydrogen's MIT license or the
+wiki's general Creative Commons license. This notice preserves the asset's
+source and copyright information.

@@ -21,6 +21,7 @@ use std::{
 #[serde(rename_all = "camelCase")]
 pub struct View {
     pub instances: Vec<Instance>,
+    pub instance_icons: std::collections::BTreeMap<String, String>,
     pub selected_instance_id: String,
     pub settings: Settings,
     pub java_runtimes: Vec<Java>,
@@ -47,6 +48,7 @@ pub struct Launcher {
     pub store: Mutex<Store>,
     pub tasks: Tasks,
     pub java: Mutex<Vec<Java>>,
+    instance_icons: Mutex<super::instance_icons::Icons>,
     pub accounts: Accounts,
     pub(crate) identity: Mutex<()>,
     pub plugins: crate::plugins::host::PluginHost,
@@ -102,6 +104,7 @@ impl Launcher {
             store: Mutex::new(store),
             tasks: Tasks::default(),
             java: Mutex::new(Vec::new()),
+            instance_icons: Mutex::new(super::instance_icons::Icons::default()),
             accounts: Accounts::new(plugins.clone()),
             identity: Mutex::new(()),
             plugins,
@@ -168,8 +171,22 @@ impl Launcher {
                 .any(|t| t.kind == "login" && t.active() && t.phase != "restoring"),
         );
         let memory = storage::memory_advice(&self.client)?;
+        let instance_icons = {
+            let mut icons = self.instance_icons.lock().unwrap();
+            instances
+                .iter()
+                .filter_map(|instance| {
+                    let directory = instance.directory_name.as_deref()?;
+                    Some((
+                        instance.info.id.clone(),
+                        icons.load(&lease.game_root, directory)?,
+                    ))
+                })
+                .collect()
+        };
         Ok(View {
             instances,
+            instance_icons,
             selected_instance_id: selected,
             settings: lease.settings.clone(),
             java_runtimes,

@@ -1,5 +1,5 @@
 /** Generated from theme-contract.json. */
-export type ThemePart = "titlebar" | "brand" | "brand-image" | "sidebar" | "nav-item" | "content" | "page" | "page-heading" | "card" | "button" | "input-shell";
+export type ThemePart = "titlebar" | "brand" | "brand-image" | "instance-icon" | "sidebar" | "nav-item" | "content" | "page" | "page-heading" | "card" | "button" | "input-shell";
 export type ThemeSlot = "window.background" | "content.background" | "sidebar.background" | "titlebar.decoration" | "sidebar.decoration" | "content.decoration";
 export type ThemeToken = "--h-surface-canvas" | "--h-surface-sidebar" | "--h-surface-card" | "--h-surface-popup" | "--h-surface-input" | "--h-text-primary" | "--h-text-secondary" | "--h-text-disabled" | "--h-border" | "--h-control-hover" | "--h-control-active" | "--h-selection" | "--h-primary" | "--h-on-primary" | "--h-primary-hover" | "--h-focus-ring" | "--h-control-border" | "--h-danger" | "--h-danger-surface" | "--h-success" | "--h-progress" | "--h-scrollbar" | "--h-font-body" | "--h-font-size" | "--h-font-weight" | "--h-line-height" | "--h-space" | "--h-page-padding" | "--h-radius" | "--h-card-radius" | "--h-shadow" | "--h-sidebar-width" | "--h-sidebar-collapsed-width" | "--h-titlebar-height";
 export interface ThemeChoice { id: string; mode: 'light' | 'dark' | 'system'; material: 'auto' | 'opaque' }

@@ -13,6 +13,7 @@ const SERVICE: &str = "platform.windows.environment";
 pub(crate) enum AboutLink {
     Developer,
     Bmclapi,
+    Mcim,
     Releases,
     MiSansLicense,
 }

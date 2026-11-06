@@ -1,6 +1,41 @@
 {
   "bundled": [
     {
+      "ecosystem": "Artwork",
+      "files": ["licenses/MCIM-logo.txt"],
+      "license": "LicenseRef-MCIM-Logo",
+      "name": "MCIM Logo",
+      "version": ""
+    },
+    {
+      "ecosystem": "Artwork",
+      "files": ["licenses/Minecraft-grass-block.txt"],
+      "license": "LicenseRef-Mojang-Minecraft-Asset",
+      "name": "Minecraft Grass Block Inventory Icon",
+      "version": "2023-10-15"
+    },
+    {
+      "ecosystem": "Artwork",
+      "files": ["licenses/Minecraft-anvil.txt"],
+      "license": "LicenseRef-Mojang-Minecraft-Asset",
+      "name": "Minecraft Anvil Inventory Icon",
+      "version": "2023-10-15"
+    },
+    {
+      "ecosystem": "Artwork",
+      "files": ["licenses/Fabric-logo.txt"],
+      "license": "MIT",
+      "name": "Fabric Logo",
+      "version": ""
+    },
+    {
+      "ecosystem": "Artwork",
+      "files": ["licenses/NeoForge-logo.txt"],
+      "license": "CC-BY-4.0",
+      "name": "NeoForge Logo",
+      "version": ""
+    },
+    {
       "files": [
         "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.3800.47/microsoft.web.webview2.1.0.3800.47.nupkg#LICENSE.txt",
         "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.3800.47/microsoft.web.webview2.1.0.3800.47.nupkg#NOTICE.txt"

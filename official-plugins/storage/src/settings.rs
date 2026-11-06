@@ -20,6 +20,8 @@ pub struct Settings {
     pub after_launch: String,
     pub jvm_arguments: String,
     pub download_source: String,
+    #[serde(default = "default_mod_mirror")]
+    pub use_mod_mirror: bool,
     // Retained for existing configuration files; availability follows the plugin state.
     pub offline_enabled: bool,
     pub offline_player_name: String,
@@ -29,6 +31,9 @@ pub struct Settings {
 }
 fn default_locale() -> String {
     "zh-CN".into()
+}
+fn default_mod_mirror() -> bool {
+    true
 }
 impl Default for Settings {
     fn default() -> Self {
@@ -45,6 +50,7 @@ impl Default for Settings {
             after_launch: "minimize".into(),
             jvm_arguments: String::new(),
             download_source: "official".into(),
+            use_mod_mirror: true,
             offline_enabled: true,
             offline_player_name: "Player".into(),
             account_mode: "microsoft".into(),

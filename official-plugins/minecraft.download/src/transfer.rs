@@ -35,6 +35,7 @@ pub fn trusted(url: &Url) -> bool {
                 "repo1.maven.org",
                 "libraries.optifine.net",
                 "api.modrinth.com",
+                "mod.mcimirror.top",
                 "cdn.modrinth.com",
                 "cdn.jsdelivr.net",
                 "raw.githubusercontent.com",
@@ -167,7 +168,34 @@ fn verification_error(code: &str, message: &str) -> ApiError {
     error.retryable = true;
     error
 }
-fn sources(url: &str, mirror: bool) -> Result<Vec<String>> {
+fn sources(url: &str, mirror: bool, mod_mirror: bool) -> Result<Vec<String>> {
+    let mut parsed = Url::parse(url).map_err(|_| ApiError::new("INVALID_URL", "下载地址无效。"))?;
+    if !trusted(&parsed) {
+        return Err(ApiError::new("UNTRUSTED_URL", "文件来自不受支持的服务。"));
+    }
+    if parsed.host_str() == Some("mod.mcimirror.top") {
+        let host = if parsed.path().starts_with("/data/") {
+            "cdn.modrinth.com"
+        } else if parsed.path().starts_with("/files/") {
+            "edge.forgecdn.net"
+        } else {
+            return Err(ApiError::new("UNTRUSTED_URL", "文件来自不受支持的服务。"));
+        };
+        let _ = parsed.set_host(Some(host));
+    }
+    if matches!(
+        parsed.host_str(),
+        Some("cdn.modrinth.com" | "edge.forgecdn.net")
+    ) {
+        let original = parsed.to_string();
+        let mut urls = Vec::new();
+        if mod_mirror {
+            let _ = parsed.set_host(Some("mod.mcimirror.top"));
+            urls.push(parsed.to_string());
+        }
+        urls.push(original);
+        return Ok(urls);
+    }
     let original = object_endpoint(url)?;
     let mapped = object_endpoint(&source_url(url, true)?)?;
     let mut mirrors = Vec::new();
@@ -234,6 +262,7 @@ pub async fn ensure_game_file(
     sha1: Option<&str>,
     size: Option<u64>,
     mirror: bool,
+    mod_mirror: bool,
     job: &Job,
 ) -> Result<std::path::PathBuf> {
     if sha1.is_some_and(|hash| !valid_hash(hash)) {
@@ -259,7 +288,7 @@ pub async fn ensure_game_file(
     let _guard = tokio::select! { _=job.cancel.cancelled()=>return Err(ApiError::new("CANCELLED","下载已取消。")), guard=lock.lock()=>guard };
     job.check()?;
     job.file_started(relative);
-    let sources = sources(url, mirror)?;
+    let sources = sources(url, mirror, mod_mirror)?;
     let mut last_error = ApiError::new("DOWNLOAD_FAILED", "下载失败。");
     for (source_index, source) in sources.iter().enumerate() {
         for attempt in 0..3 {
@@ -280,7 +309,10 @@ pub async fn ensure_game_file(
             }
         }
         if source_index + 1 >= sources.len()
-            || !source_failure(&last_error)
+            || !(source_failure(&last_error)
+                || source.starts_with("https://mod.mcimirror.top/")
+                    && (last_error.code.starts_with("DOWNLOAD_HTTP_")
+                        || last_error.code == "UNTRUSTED_URL"))
             || job.cancel.is_cancelled()
         {
             break;
@@ -500,21 +532,40 @@ fn network_error(error: ApiError) -> ApiError {
 mod tests {
     use super::*;
     #[test]
+    fn mod_sources_prefer_mcim_and_disable_all_mod_mirrors() {
+        for url in [
+            "https://cdn.modrinth.com/data/Project1/versions/Version1/a%2Bb.jar?token=value",
+            "https://edge.forgecdn.net/files/123/456/a%20b.jar",
+        ] {
+            let mut mirror = Url::parse(url).unwrap();
+            mirror.set_host(Some("mod.mcimirror.top")).unwrap();
+            assert_eq!(
+                sources(url, false, true).unwrap(),
+                [mirror.to_string(), url.into()]
+            );
+            assert_eq!(sources(url, true, false).unwrap(), [url]);
+            assert_eq!(sources(mirror.as_str(), false, false).unwrap(), [url]);
+        }
+        let mediafilez = "https://mediafilez.forgecdn.net/files/123/456/mod.jar";
+        assert_eq!(sources(mediafilez, true, true).unwrap(), [mediafilez]);
+        assert!(sources("https://mod.mcimirror.top/unknown", false, false).is_err());
+    }
+    #[test]
     fn forge_sources_keep_official_urls_and_recover_from_mirror_failures() {
         let path = "/net/minecraftforge/forge/1.20.1-47.4.0/forge-1.20.1-47.4.0-installer.jar";
         let official = format!("https://maven.minecraftforge.net{path}");
         let bmcl = format!("https://bmclapi2.bangbang93.com/maven{path}");
         let university = format!("https://mirror.nju.edu.cn/bmclapi{path}");
         assert_eq!(
-            sources(&official, false).unwrap(),
+            sources(&official, false, true).unwrap(),
             [official.clone(), bmcl.clone(), university.clone()]
         );
         assert_eq!(
-            sources(&official, true).unwrap(),
+            sources(&official, true, true).unwrap(),
             [bmcl.clone(), university.clone(), official]
         );
-        assert_eq!(sources(&bmcl, true).unwrap(), [university, bmcl]);
-        assert!(sources("https://untrusted.invalid/file", true).is_err());
+        assert_eq!(sources(&bmcl, true, true).unwrap(), [university, bmcl]);
+        assert!(sources("https://untrusted.invalid/file", true, true).is_err());
         for code in [
             "DOWNLOAD_HTTP_302",
             "DOWNLOAD_HTTP_403",

@@ -2,6 +2,29 @@ use hydrogen::launcher::{java, storage::*};
 use std::fs;
 
 #[test]
+fn mod_mirror_defaults_enable_existing_settings_and_persist_opt_out() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = Store::open(dir.path().to_path_buf()).unwrap();
+    assert!(store.settings.use_mod_mirror);
+    let mut settings = store.settings.clone();
+    settings.use_mod_mirror = false;
+    store.save(settings).unwrap();
+    drop(store);
+    let store = Store::open(dir.path().to_path_buf()).unwrap();
+    assert!(!store.settings.use_mod_mirror);
+    let mut legacy: serde_json::Value = read_json(&dir.path().join("settings.json")).unwrap();
+    legacy["settings"]
+        .as_object_mut()
+        .unwrap()
+        .remove("useModMirror");
+    drop(store);
+    write_json(&dir.path().join("settings.json"), &legacy).unwrap();
+    let store = Store::open(dir.path().to_path_buf()).unwrap();
+    assert!(!store.read_only);
+    assert!(store.settings.use_mod_mirror);
+}
+
+#[test]
 fn theme_choice_survives_native_storage_round_trips_and_invalid_ids_are_rejected() {
     let directory = tempfile::tempdir().unwrap();
     let mut store = Store::open(directory.path().to_path_buf()).unwrap();

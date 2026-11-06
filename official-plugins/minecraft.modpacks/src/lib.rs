@@ -560,4 +560,57 @@ mod tests {
         assert!(!content_path("My Pack.JSON", "my pack"));
         assert!(!content_path("config/COM¹.txt", "my pack"));
     }
+
+    #[test]
+    fn import_preserves_bounded_root_artwork_without_extracting_unrelated_files() {
+        let root = tempfile::tempdir().unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        let client = Client::new(&PluginHost, &Settings::default()).unwrap();
+        for (format, extension) in [(Format::Modrinth, "mrpack"), (Format::Curseforge, "zip")] {
+            let source = root.path().join(format!("Pack.{extension}"));
+            let mut zip = ZipWriter::new(File::create(&source).unwrap());
+            let options = SimpleFileOptions::default();
+            zip.start_file(format.manifest(), options).unwrap();
+            let manifest = match format {
+                Format::Modrinth => br#"{"formatVersion":1,"game":"minecraft","name":"Pack","versionId":"1","files":[],"dependencies":{"minecraft":"1.21.1"}}"#.as_slice(),
+                Format::Curseforge => br#"{"manifestType":"minecraftModpack","manifestVersion":1,"name":"Pack","version":"1","minecraft":{"version":"1.21.1","modLoaders":[]},"files":[],"overrides":"overrides"}"#.as_slice(),
+            };
+            zip.write_all(manifest).unwrap();
+            for (name, data) in [
+                ("Icon.PNG", b"pack image".as_slice()),
+                ("logo.webp", b"alternate image"),
+                ("unrelated.png", b"ignored"),
+                ("overrides/PCL/Logo.png", b"pcl image"),
+            ] {
+                zip.start_file(name, options).unwrap();
+                zip.write_all(data).unwrap();
+            }
+            zip.start_file("pack.jpg", options).unwrap();
+            zip.write_all(&vec![0; 2 * 1024 * 1024 + 1]).unwrap();
+            zip.add_symlink("icon.jpeg", "unrelated.png", options)
+                .unwrap();
+            zip.finish().unwrap();
+            let (_, pack) = Pack::open(&source).unwrap();
+            let stage = root.path().join(extension);
+            fs::create_dir(&stage).unwrap();
+            let import = serde_json::from_value(json!({"source":source,"stage":stage,"directory":"Pack","preview":pack.preview().unwrap(),"downloadsEnabled":false,"optional":false})).unwrap();
+            runtime
+                .block_on(sources::prepare(&client, import, &Job::default()))
+                .unwrap();
+            assert_eq!(
+                fs::read(stage.join(".hydrogen/instance-icon/icon.png")).unwrap(),
+                b"pack image"
+            );
+            assert_eq!(
+                fs::read(stage.join(".hydrogen/instance-icon/logo.webp")).unwrap(),
+                b"alternate image"
+            );
+            assert_eq!(fs::read(stage.join("PCL/Logo.png")).unwrap(), b"pcl image");
+            assert!(!stage.join(".hydrogen/instance-icon/pack.jpg").exists());
+            assert!(!stage.join(".hydrogen/instance-icon/icon.jpeg").exists());
+            assert!(!stage.join("unrelated.png").exists());
+        }
+    }
 }
