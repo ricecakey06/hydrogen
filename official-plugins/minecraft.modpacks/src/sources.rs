@@ -1,4 +1,5 @@
 use super::archive::{self, CurseFile, IndexFile, Pack, add_size, invalid};
+use futures_util::{StreamExt, stream};
 use hydrogen_plugin_services::{
     contracts::{ApiError, Result},
     curseforge::{self, CurseFile as CurseMetadata},
@@ -16,6 +17,7 @@ use std::{
     fs::{self, File, OpenOptions},
     io::Read,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 const MODRINTH: &str = "https://api.modrinth.com/v2";
@@ -179,6 +181,7 @@ async fn curse_downloads(
     files: &[CurseFile],
     optional: bool,
     api_key: Option<&str>,
+    job: &Job,
 ) -> Result<Vec<Download>> {
     let wanted: Vec<_> = files.iter().filter(|f| f.required || optional).collect();
     if wanted.is_empty() {
@@ -188,76 +191,107 @@ async fn curse_downloads(
     let mut projects: Vec<_> = wanted.iter().map(|f| f.project).collect();
     projects.sort_unstable();
     projects.dedup();
-    let mut classes = HashMap::new();
+    let mut requests = Vec::new();
     for batch in projects.chunks(100) {
-        let response = curseforge::fetch(
-            client
-                .post(curseforge::endpoint("mods"))
-                .json(&json!({"modIds":batch})),
-            api_key,
-        )
-        .await?;
-        for project in response["data"]
-            .as_array()
-            .ok_or_else(|| invalid("CurseForge 项目信息无效。"))?
-        {
-            if project["gameId"] == 432
-                && let (Some(id), Some(class)) =
-                    (project["id"].as_u64(), project["classId"].as_u64())
+        requests.push((true, json!({"modIds":batch})));
+    }
+    for batch in wanted.chunks(100) {
+        let ids: Vec<_> = batch.iter().map(|file| file.file).collect();
+        requests.push((false, json!({"fileIds":ids})));
+    }
+    let total = requests.len();
+    let report = |completed| {
+        job.phase(
+            "resolving",
+            format!("正在获取 CurseForge 整合包文件信息（{completed}/{total} 批）…"),
+        );
+    };
+    report(0);
+    // Poll the requests inside the import future so cancellation drops every HTTP handle.
+    let mut pending = stream::iter(requests)
+        .map(|(project, payload)| async move {
+            let endpoint = if project { "mods" } else { "mods/files" };
+            let response = tokio::time::timeout(
+                Duration::from_secs(90),
+                curseforge::fetch(
+                    client.post(curseforge::endpoint(endpoint)).json(&payload),
+                    api_key,
+                ),
+            )
+            .await
+            .map_err(|_| {
+                let mut error = ApiError::new(
+                    "CURSEFORGE_METADATA_TIMEOUT",
+                    "获取 CurseForge 整合包文件信息超时，请检查连接后重试。",
+                );
+                error.retryable = true;
+                error
+            })??;
+            Ok::<_, ApiError>((project, response))
+        })
+        .buffer_unordered(4);
+    let mut classes = HashMap::new();
+    let mut metadata = HashMap::new();
+    let mut completed = 0;
+    while let Some(response) = pending.next().await {
+        job.check()?;
+        let (project, response) = response?;
+        if project {
+            for project in response["data"]
+                .as_array()
+                .ok_or_else(|| invalid("CurseForge 项目信息无效。"))?
             {
-                classes.insert(id, class);
+                if project["gameId"] == 432
+                    && let (Some(id), Some(class)) =
+                        (project["id"].as_u64(), project["classId"].as_u64())
+                {
+                    classes.insert(id, class);
+                }
             }
+        } else {
+            let files: Vec<CurseMetadata> = serde_json::from_value(response["data"].clone())?;
+            metadata.extend(files.into_iter().map(|file| (file.id, file)));
         }
+        completed += 1;
+        report(completed);
     }
     let mut result = Vec::with_capacity(wanted.len());
-    for batch in wanted.chunks(100) {
-        let ids: Vec<_> = batch.iter().map(|f| f.file).collect();
-        let response = curseforge::fetch(
-            client
-                .post(curseforge::endpoint("mods/files"))
-                .json(&json!({"fileIds":ids})),
-            api_key,
-        )
-        .await?;
-        let files: Vec<CurseMetadata> = serde_json::from_value(response["data"].clone())?;
-        let mut files: HashMap<_, _> = files.into_iter().map(|f| (f.id, f)).collect();
-        for spec in batch {
-            let file = files
-                .remove(&spec.file)
-                .filter(|f| f.mod_id == spec.project && f.game_id == 432)
-                .ok_or_else(|| {
-                    invalid(format!(
-                        "找不到 CurseForge 文件（{} / {}）。",
-                        spec.project, spec.file
-                    ))
-                })?;
-            let directory = match classes.get(&u64::from(spec.project)) {
-                Some(6) => "mods",
-                Some(12) => "resourcepacks",
-                Some(6552) => "shaderpacks",
-                Some(6945) => "datapacks",
-                _ => {
-                    return Err(invalid(format!(
-                        "暂不支持此 CurseForge 项目类型（{}）。",
-                        spec.project
-                    )));
-                }
-            };
-            if file.file_name.contains('/') || !archive::portable_path(&file.file_name) {
-                return Err(invalid("CurseForge 文件名无效。"));
+    for spec in wanted {
+        let file = metadata
+            .remove(&spec.file)
+            .filter(|f| f.mod_id == spec.project && f.game_id == 432)
+            .ok_or_else(|| {
+                invalid(format!(
+                    "找不到 CurseForge 文件（{} / {}）。",
+                    spec.project, spec.file
+                ))
+            })?;
+        let directory = match classes.get(&u64::from(spec.project)) {
+            Some(6) => "mods",
+            Some(12) => "resourcepacks",
+            Some(6552) => "shaderpacks",
+            Some(6945) => "datapacks",
+            _ => {
+                return Err(invalid(format!(
+                    "暂不支持此 CurseForge 项目类型（{}）。",
+                    spec.project
+                )));
             }
-            let sha1 = file.sha1().map(str::to_ascii_lowercase);
-            let url = file.url().ok();
-            result.push(Download {
-                path: format!("{directory}/{}", file.file_name),
-                urls: url.map(str::to_owned).into_iter().collect(),
-                curse_file_id: url.is_none().then_some(file.id),
-                fingerprint: sha1.is_none().then_some(file.file_fingerprint),
-                sha1,
-                sha512: None,
-                size: file.file_length,
-            });
+        };
+        if file.file_name.contains('/') || !archive::portable_path(&file.file_name) {
+            return Err(invalid("CurseForge 文件名无效。"));
         }
+        let sha1 = file.sha1().map(str::to_ascii_lowercase);
+        let url = file.url().ok();
+        result.push(Download {
+            path: format!("{directory}/{}", file.file_name),
+            urls: url.map(str::to_owned).into_iter().collect(),
+            curse_file_id: url.is_none().then_some(file.id),
+            fingerprint: sha1.is_none().then_some(file.file_fingerprint),
+            sha1,
+            sha512: None,
+            size: file.file_length,
+        });
     }
     Ok(result)
 }
@@ -306,6 +340,7 @@ async fn resolve_curse_downloads(
     }
     for batch in missing.chunks_mut(100) {
         job.check()?;
+        job.phase("resolving", "正在查找整合包文件的备用下载地址…");
         let hashes = batch
             .iter()
             .filter_map(|file| file.sha1.as_deref())
@@ -313,7 +348,12 @@ async fn resolve_curse_downloads(
         if hashes.is_empty() {
             continue;
         }
-        let Ok(versions) = modrinth_versions(client, "sha1", hashes).await else {
+        let Ok(Ok(versions)) = tokio::time::timeout(
+            Duration::from_secs(30),
+            modrinth_versions(client, "sha1", hashes),
+        )
+        .await
+        else {
             break;
         };
         for file in batch {
@@ -404,6 +444,7 @@ pub async fn prepare(client: &Client, options: Prepare, job: &Job) -> Result<Val
             &manifest.files,
             optional,
             curseforge::api_key().as_deref(),
+            job,
         )
         .await?;
     }

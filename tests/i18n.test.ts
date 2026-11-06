@@ -38,6 +38,7 @@ test('bundles cover launcher messages, preserve placeholders and format native p
   assert.equal(t('已添加 {0}', 'Alex'), 'Added Alex');
   assert.equal(t('找到 3 个 Java 运行时'), 'Found 3 Java runtimes');
   assert.equal(t('游戏异常退出（退出码 1）'), 'Game exited unexpectedly (exit code 1)');
+  assert.equal(t('正在获取 CurseForge 整合包文件信息（0/6 批）…'), 'Retrieving CurseForge modpack file metadata (batch 0/6)…');
   assert.equal(t('unknown custom text'), 'unknown custom text');
   assert.equal(t('toString'), 'toString');
   setLanguage(chinese, []);

@@ -848,6 +848,9 @@
     "更多功能": "More functions",
     "更多插件功能": "More plugin functions",
     "更多功能（{0} 项）": "More functions ({0})",
-    "{0} 项功能": "{0} functions"
+    "{0} 项功能": "{0} functions",
+    "正在获取 CurseForge 整合包文件信息（{0}/{1} 批）…": "Retrieving CurseForge modpack file metadata (batch {0}/{1})…",
+    "获取 CurseForge 整合包文件信息超时，请检查连接后重试。": "Retrieving CurseForge modpack file metadata timed out. Check your connection and retry.",
+    "正在查找整合包文件的备用下载地址…": "Looking for alternative modpack file download URLs…"
   }
 }

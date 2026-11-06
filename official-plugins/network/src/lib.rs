@@ -255,6 +255,14 @@ mod tests {
     use std::io::{Read, Write};
 
     fn server(status: u16, body: &'static str) -> (String, std::thread::JoinHandle<String>) {
+        server_bytes(status, body.as_bytes().to_vec(), "")
+    }
+
+    fn server_bytes(
+        status: u16,
+        body: Vec<u8>,
+        headers: &'static str,
+    ) -> (String, std::thread::JoinHandle<String>) {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let url = format!("http://{}/", listener.local_addr().unwrap());
         let handle = std::thread::spawn(move || {
@@ -263,13 +271,34 @@ mod tests {
             let length = stream.read(&mut bytes).unwrap();
             write!(
                 stream,
-                "HTTP/1.1 {status} Test\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                "HTTP/1.1 {status} Test\r\nContent-Length: {}\r\n{headers}Connection: close\r\n\r\n",
                 body.len()
             )
             .unwrap();
+            stream.write_all(&body).unwrap();
             String::from_utf8_lossy(&bytes[..length]).into_owned()
         });
         (url, handle)
+    }
+
+    #[tokio::test]
+    async fn compressed_metadata_is_requested_and_decoded_before_mirror_validation() {
+        // gzip-compressed {"cached":true}, matching a CurseForge JSON response.
+        let body = vec![
+            31, 139, 8, 0, 0, 0, 0, 0, 2, 255, 171, 86, 74, 78, 76, 206, 72, 77, 81, 178, 42, 41,
+            42, 77, 173, 5, 0, 158, 145, 79, 62, 15, 0, 0, 0,
+        ];
+        let (mirror, server) = server_bytes(200, body, "Content-Encoding: gzip\r\n");
+        let client = policy::client().unwrap();
+        let stream = send_request(client.get("http://127.0.0.1:1/"), Some(client.get(mirror)))
+            .await
+            .unwrap();
+        assert!(stream.finished);
+        assert_eq!(
+            stream.pending.into_iter().collect::<Vec<_>>(),
+            br#"{"cached":true}"#
+        );
+        assert!(server.join().unwrap().contains("accept-encoding: gzip"));
     }
 
     #[tokio::test]
