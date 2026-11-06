@@ -219,7 +219,10 @@ impl Store {
             return Err(ApiError::new("INVALID_VERSION", "游戏版本无效。"));
         }
         if let Some(component) = &components
-            && (!["", "fabric", "forge", "neoforge", "quilt"].contains(&component.kind.as_str())
+            && ((!["", "fabric", "forge", "neoforge", "quilt"].contains(&component.kind.as_str())
+                && !component.kind.split_once(':').is_some_and(|(a, b)| {
+                    !a.is_empty() && !b.is_empty() && component.kind.len() <= 201
+                }))
                 || component.loader.is_empty()
                 || component.loader.len() > 100
                 || !component

@@ -258,8 +258,19 @@ fn lock_mod_directory(game: &Path) -> Result<std::fs::File> {
 #[cfg(feature = "desktop")]
 impl super::core::Launcher {
     pub async fn resource_catalog(&self, method: &str, params: Value) -> Result<Value> {
+        let lease = self.lease();
+        let mut params = params;
+        if let Some(source) = params["source"].as_str().map(String::from) {
+            if let Some(id) = source.strip_prefix("minecraft.resources:") {
+                params["source"] = json!(id);
+            } else if source.contains(':') {
+                return self
+                    .plugins
+                    .provider_call(&lease.settings, "resourceSource", &source, method, params)
+                    .await;
+            }
+        }
         self.require("minecraft.resources")?;
-        let _lease = self.lease();
         super::net::task(&self.client, "minecraft.resources", method, params, None).await
     }
     fn mod_target(instance: &super::storage::Instance) -> Result<Value> {
@@ -372,14 +383,22 @@ impl super::core::Launcher {
             let _lock = lock;
             let _mod_lock = mod_lock;
             let result = async {
-                let result = super::net::task(
-                    &core.client,
-                    "minecraft.resources",
-                    method,
-                    params,
-                    Some(&job),
-                )
-                .await?;
+                let mut params = params;
+                if method == "download" && let Some(source) = params["source"].as_str().map(String::from) {
+                    if let Some(id) = source.strip_prefix("minecraft.resources:") { params["source"] = json!(id); }
+                    else if source.contains(':') {
+                        job.phase("resolving", "正在读取资源提供者的下载计划…");
+                        // Pass only public target metadata; internal paths never reach JS.
+                        let request = json!({"project":params["project"],"versionId":params["versionId"],"gameVersion":params["gameVersion"],"loader":params["loader"]});
+                        let plan = core.plugins.provider_call(&lease.settings, "resourceSource", &source, "downloadPlan", request).await?;
+                        let (provider,_) = core.plugins.provider(&lease.settings,"resourceSource",&source)?;
+                        params["allowedHosts"] = json!(provider.manifest.scopes.http);
+                        params["plan"] = plan;
+                        params["source"] = Value::Null;
+                    }
+                }
+                let operation = if params["plan"].is_null() { method } else { "downloadPlan" };
+                let result = super::net::task(&core.client, "minecraft.resources", operation, params, Some(&job)).await?;
                 if method == "download" {
                     let paths: Vec<PathBuf> = serde_json::from_value(result)?;
                     if paths.is_empty() {

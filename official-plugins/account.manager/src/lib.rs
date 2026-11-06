@@ -21,6 +21,21 @@ struct State {
 fn microsoft(method: &str, params: Value) -> Result<Value> {
     invoke("account.microsoft", "account.microsoft", method, params)
 }
+fn custom(id: &str, method: &str, params: Value) -> Result<Value> {
+    invoke(
+        "host.providers",
+        "accountProvider",
+        method,
+        json!({"id":id,"params":params}),
+    )
+}
+fn provider_available(settings: &Settings, id: &str) -> bool {
+    if id.contains(':') {
+        custom(id, "__available", Value::Null).is_ok_and(|v| v == true)
+    } else {
+        PluginHost.available(settings, id)
+    }
+}
 fn profile_views(
     root: &std::path::Path,
     settings: &Settings,
@@ -144,13 +159,15 @@ impl State {
         let root = PathBuf::from(text(p, "root")?);
         let mut profiles = Profiles::load(&root, &settings)?;
         let offline = settings.offline_selected();
-        let selected = profiles.selected(offline).cloned();
-        let provider = if offline {
+        let selected = profiles.selected_mode(&settings).cloned();
+        let provider = if settings.account_mode.contains(':') {
+            settings.account_mode.as_str()
+        } else if offline {
             "account.offline"
         } else {
             "account.microsoft"
         };
-        let available = PluginHost.available(&settings, provider);
+        let available = provider_available(&settings, provider);
         match method.as_str() {
             "profiles.list" => Ok(
                 json!({"profiles":profile_views(&root, &settings, &profiles)?,"selectedProfileId":selected.map(|p|p.id)}),
@@ -160,6 +177,15 @@ impl State {
                     .and_then(|r| storage::within(&r, "credentials.bin"))
                     .is_ok_and(|p| p.is_file())
             }))),
+            "profiles.addProvider" => {
+                let id = text(p, "provider")?;
+                if !provider_available(&settings, id) {
+                    return Err(ApiError::new("UNKNOWN_PROVIDER", "账号提供者不可用。"));
+                }
+                let profile = profiles.add_provider(id, text(p, "name")?)?;
+                profiles.save(&root)?;
+                Ok(serde_json::to_value(profile)?)
+            }
             "profiles.addOffline" => {
                 if !PluginHost.available(&settings, "account.offline") {
                     return Err(ApiError::new("PLUGIN_DISABLED", "请先启用离线启动插件。"));
@@ -170,8 +196,12 @@ impl State {
             }
             "profiles.select" => {
                 let profile = profiles.select(text(p, "id")?)?;
-                let id = format!("account.{}", profile.kind);
-                if !PluginHost.available(&settings, &id) {
+                let id = if profile.kind.contains(':') {
+                    profile.kind.clone()
+                } else {
+                    format!("account.{}", profile.kind)
+                };
+                if !provider_available(&settings, &id) {
                     return Err(ApiError::new("PLUGIN_DISABLED", "此档案的账号插件未启用。"));
                 }
                 profiles.save(&root)?;
@@ -213,6 +243,12 @@ impl State {
             "view" => {
                 let mut view = if !available {
                     json!({"status":"unavailable","playerName":null,"detail":"所选账号提供者不可用。","skin":null})
+                } else if provider.contains(':') {
+                    if let Some(profile) = &selected {
+                        custom(provider, "view", json!({"profileId":profile.id}))?
+                    } else {
+                        json!({"status":"signedOut","playerName":null,"detail":null,"skin":null})
+                    }
                 } else if let Some(profile) = &selected {
                     invoke(
                         provider,
@@ -249,7 +285,7 @@ impl State {
                 if p["signingIn"] == true {
                     view["status"] = "signingIn".into();
                 }
-                view["mode"] = if offline { "offline" } else { "microsoft" }.into();
+                view["mode"] = settings.account_mode.clone().into();
                 view["offlineAvailable"] =
                     PluginHost.available(&settings, "account.offline").into();
                 view["selectedProfileId"] = json!(selected.map(|p| p.id));
@@ -267,6 +303,9 @@ impl State {
             }
             "signOut" => {
                 if let Some(profile) = selected {
+                    if provider.contains(':') {
+                        return custom(provider, "signOut", json!({"profileId":profile.id}));
+                    }
                     invoke(
                         provider,
                         provider,
@@ -283,6 +322,16 @@ impl State {
             "signIn" | "session" => {
                 if !available {
                     return Err(ApiError::new("PLUGIN_DISABLED", "账号插件未启用。"));
+                }
+                if provider.contains(':') {
+                    let profile = selected
+                        .ok_or_else(|| ApiError::new("ACCOUNT_REQUIRED", "请先添加档案。"))?;
+                    let result = custom(
+                        provider,
+                        &method,
+                        json!({"profileId":profile.id,"restore":p["restore"]}),
+                    )?;
+                    return Ok(json!({"ready":true,"result":result}));
                 }
                 if offline {
                     let profile = selected.ok_or_else(|| {

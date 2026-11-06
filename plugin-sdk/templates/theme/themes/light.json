@@ -1,0 +1,1 @@
+{ "themeVersion": 1, "scheme": "light", "extends": "builtin.light.v1", "styles": ["light.css"] }

@@ -1,0 +1,19 @@
+/* Host recovery and noninteractive layers keep final priority. Theme typography remains flexible. */
+[data-h-theme-root] { isolation: isolate !important; }
+[data-h-theme-slot] { position: absolute !important; inset: 0 !important; pointer-events: none !important; user-select: none !important; overflow: hidden !important; z-index: 0 !important; }
+[data-h-theme-slot$='.decoration'] { z-index: 2 !important; }
+[data-h-layer] { pointer-events: none !important; user-select: none !important; }
+[data-h-part='titlebar'] { position: relative; z-index: 5; }
+.caption-button, .sidebar-toggle { flex-shrink: 0 !important; pointer-events: auto !important; visibility: visible !important; }
+.modal-overlay { z-index: 100 !important; }
+.error-toast { z-index: 101 !important; }
+@media (prefers-reduced-motion: reduce) {
+  [data-h-theme-root], [data-h-theme-root] *, [data-h-theme-root] *::before, [data-h-theme-root] *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+@media (forced-colors: active) {
+  [data-h-theme-root] { color: CanvasText !important; background: Canvas !important; --h-surface-canvas: Canvas !important; --h-surface-sidebar: Canvas !important; --h-surface-card: Canvas !important; --h-surface-input: Canvas !important; --h-surface-popup: Canvas !important; --h-text-primary: CanvasText !important; --h-text-secondary: CanvasText !important; --h-border: ButtonText !important; --h-control-border: ButtonText !important; --h-primary: Highlight !important; --h-on-primary: HighlightText !important; --h-focus-ring: Highlight !important; }
+  [data-h-theme-root] *, [data-h-theme-root] *::before, [data-h-theme-root] *::after { background-image: none !important; box-shadow: none !important; }
+  [data-h-theme-slot], [data-h-part='brand-image'] { display: none !important; }
+  [data-h-builtin-brand] { display: inline !important; }
+}
+[hidden] { display: none !important; }

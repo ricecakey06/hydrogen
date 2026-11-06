@@ -39,14 +39,14 @@
 </script>
 
 <div class="plugins-page">
-  <div class="plugins-toolbar"><div><h2>{t("安装、启用和管理插件")}</h2><p class="plugin-label">{builtIns.length} {t("个内置模块 ·")} {external.length} {t("个外置插件")}</p></div><button class="icon-button" aria-label={t("刷新插件列表")} onclick={onrefresh}><Icon name="refresh" size={18} /></button><button class="primary" onclick={oninstall}>{t("＋ 安装插件")}</button></div>
+  <div class="plugins-toolbar"><div><h2>{t("安装、启用和管理插件")}</h2><p class="plugin-label">{builtIns.length} {t("个内置模块 ·")} {external.length} {t("个外置插件")}</p></div><button data-h-part="button" class="icon-button" aria-label={t("刷新插件列表")} onclick={onrefresh}><Icon name="refresh" size={18} /></button><button data-h-part="button" data-h-variant="primary" class="primary" onclick={oninstall}>{t("＋ 安装插件")}</button></div>
   {#if error && !selected}<p class="issue" role="alert">{error}</p>{/if}
   {#if !selected}
     <div class="plugin-filters"><div class="segmented" role="group" aria-label={t("插件分类")}>
-      <button class:selected={filter === 'all'} aria-pressed={filter === 'all'} onclick={() => changeFilter('all')}>{t("全部（{0}）", plugins.length)}</button>
-      <button class:selected={filter === 'builtin'} aria-pressed={filter === 'builtin'} onclick={() => changeFilter('builtin')}>{t("内置（{0}）", builtIns.length)}</button>
-      <button class:selected={filter === 'external'} aria-pressed={filter === 'external'} onclick={() => changeFilter('external')}>{t("外置（{0}）", external.length)}</button>
-    </div><input class="plugin-search" aria-label={t("搜索插件")} placeholder={t("搜索名称、描述或插件 ID")} bind:value={query} /></div>
+      <button data-h-part="button" class:selected={filter === 'all'} aria-pressed={filter === 'all'} onclick={() => changeFilter('all')}>{t("全部（{0}）", plugins.length)}</button>
+      <button data-h-part="button" class:selected={filter === 'builtin'} aria-pressed={filter === 'builtin'} onclick={() => changeFilter('builtin')}>{t("内置（{0}）", builtIns.length)}</button>
+      <button data-h-part="button" class:selected={filter === 'external'} aria-pressed={filter === 'external'} onclick={() => changeFilter('external')}>{t("外置（{0}）", external.length)}</button>
+    </div><input data-h-part="input-shell" class="plugin-search" aria-label={t("搜索插件")} placeholder={t("搜索名称、描述或插件 ID")} bind:value={query} /></div>
     <div class="plugin-list-stage">
     {#each [list] as visible (visible)}
     <div class="scroll-pane plugin-list" in:fadeSlide|global={{ direction: listDirection, compact: true }} out:fadeSlide={{ direction: listDirection, compact: true }}>
@@ -55,35 +55,36 @@
         {#if items.length}
           <h3 class="plugin-group">{group.title}</h3>
           {#each items as plugin (plugin.id)}
-            <div class="plugin-row"><button class="plugin-row-main" onclick={() => details(plugin.id)}>
+            <div data-h-part="card" class="plugin-row"><button data-h-part="button" class="plugin-row-main" onclick={() => details(plugin.id)}>
               <span class="plugin-icon"><Icon name={plugin.id === 'ui.shell' ? 'settings' : plugin.id === 'ui.launcher' ? 'cube' : 'puzzle'} size={23} width={1.7} /></span>
               <span class="plugin-row-text"><span class="plugin-name">{t(plugin.name)}</span><span class="plugin-description">{t(plugin.description)}</span><span class="plugin-id">{plugin.id}</span></span>
-            </button><div class="plugin-row-state">{#if plugin.required}<span>{t("必需")}</span>{:else}<button class="plugin-toggle" role="switch" aria-checked={plugin.enabled} aria-label={`${plugin.enabled ? t("停用") : t("启用")} ${t(plugin.name)}`} disabled={busy} onclick={() => toggle(plugin)}>{plugin.enabled ? t("已启用") : t("已停用")}</button>{/if}<span class:running={plugin.enabled && !plugin.problem} class="plugin-status"><i></i>{plugin.enabled ? (plugin.problem ? t("依赖不可用") : (plugin.required ? t("运行中") : t("按需激活"))) : t("已停用")}</span></div></div>
+            </button><div data-h-part="card" class="plugin-row-state">{#if plugin.required}<span>{t("必需")}</span>{:else}<button data-h-part="button" class="plugin-toggle" role="switch" aria-checked={plugin.enabled} aria-label={`${plugin.enabled ? t("停用") : t("启用")} ${t(plugin.name)}`} disabled={busy} onclick={() => toggle(plugin)}>{plugin.enabled ? t("已启用") : t("已停用")}</button>{/if}<span class:running={plugin.enabled && !plugin.problem} class="plugin-status"><i></i>{plugin.enabled ? (plugin.problem ? t("依赖不可用") : (plugin.required ? t("运行中") : t("按需激活"))) : t("已停用")}</span></div></div>
           {/each}
         {/if}
       {/each}
-      {#if !visible.items.length}<div class="plugin-empty"><span class="empty-plugin-icon"><Icon name="puzzle" size={28} width={1.5} /></span><h3>{visible.query ? t("没有匹配的插件") : t("尚未加载外置插件")}</h3><p class="plugin-label">{visible.query ? t("请尝试其他名称、描述或插件 ID。") : t("选择本地 .hplugin 包安装插件。")}</p><button onclick={oninstall}>{t("安装本地插件")}</button></div>{/if}
+      {#if !visible.items.length}<div class="plugin-empty"><span class="empty-plugin-icon"><Icon name="puzzle" size={28} width={1.5} /></span><h3>{visible.query ? t("没有匹配的插件") : t("尚未加载外置插件")}</h3><p class="plugin-label">{visible.query ? t("请尝试其他名称、描述或插件 ID。") : t("选择本地 .hplugin 包安装插件。")}</p><button data-h-part="button" onclick={oninstall}>{t("安装本地插件")}</button></div>{/if}
       {#if visible.filter === 'all' && !visible.externalCount}<h3 class="plugin-group">{t("外置插件")}</h3><p class="plugin-label empty-installed">{t("尚未加载外置插件。可从本地目录添加扩展。")}</p>{/if}
     </div>
     {/each}
     </div>
   {:else}
     <div class="scroll-pane plugin-details" in:entrance>
-      <button class="text-button detail-back" onclick={() => details('')}>{t("‹ 返回插件列表")}</button>
-      <section class="plugin-detail-card"><div class="plugin-detail-heading"><span class="plugin-icon"><Icon name={selected.required ? 'settings' : 'puzzle'} size={28} width={1.7} /></span><div><h2>{t(selected.name)}</h2><p class="plugin-id">{selected.id}</p></div><div class="plugin-detail-state"><span>{selected.required ? t("必需") : selected.enabled ? t("已启用") : t("已停用")}</span><small>{selected.enabled ? selected.problem ? t("依赖不可用") : t("按需激活") : t("已停用")}</small></div></div>
+      <button data-h-part="button" class="text-button detail-back" onclick={() => details('')}>{t("‹ 返回插件列表")}</button>
+      <section data-h-part="card" class="plugin-detail-card"><div class="plugin-detail-heading"><span class="plugin-icon"><Icon name={selected.required ? 'settings' : 'puzzle'} size={28} width={1.7} /></span><div><h2>{t(selected.name)}</h2><p class="plugin-id">{selected.id}</p></div><div class="plugin-detail-state"><span>{selected.required ? t("必需") : selected.enabled ? t("已启用") : t("已停用")}</span><small>{selected.enabled ? selected.problem ? t("依赖不可用") : t("按需激活") : t("已停用")}</small></div></div>
         <p>{t(selected.description)}</p><div class="plugin-meta"><div><span>{t("来源")}</span><strong>{selected.origin === 'builtIn' ? t("内置模块") : selected.origin === 'installed' ? t("本地插件包") : t("开发目录")}</strong></div><div><span>{t("版本")}</span><strong>{selected.version}</strong></div><div><span>{t("作者")}</span><strong>{selected.origin === 'builtIn' ? 'Hydrogen' : t("未声明")}</strong></div></div>
         <p class="plugin-state-note">{selected.required ? t("此模块是当前部署所需的依赖。") : selected.runtime === 'native' ? t("此插件包含本机代码，拥有与启动器相同的系统权限。") : t("在独立 JavaScript 运行时中按需激活。")}</p>
       </section>
       {#if selected.problem}<p class="issue">{t(selected.problem)}</p>{/if}
-      {#if !selected.required}<div class="inline-actions"><button disabled={busy} onclick={() => toggle(selected)}>{selected.enabled ? t("停用插件") : t("启用插件")}</button><button disabled={busy || !selected.enabled} onclick={() => reload(selected.id)}>{t("校验并重载")}</button>{#if selected.origin !== 'development'}<button disabled={busy} onclick={() => onuninstall(selected)}>{t("卸载插件")}</button>{/if}</div>{/if}
+      {#if !selected.required}<div class="inline-actions"><button data-h-part="button" disabled={busy} onclick={() => toggle(selected)}>{selected.enabled ? t("停用插件") : t("启用插件")}</button><button data-h-part="button" disabled={busy || !selected.enabled} onclick={() => reload(selected.id)}>{t("校验并重载")}</button>{#if selected.origin !== 'development'}<button data-h-part="button" disabled={busy} onclick={() => onuninstall(selected)}>{t("卸载插件")}</button>{/if}</div>{/if}
       <details class="expander"><summary>{t("依赖与服务")}</summary><p class="plugin-label">{selected.dependencies.length ? JSON.stringify(selected.dependencies) : t("无外部依赖")}</p><p class="plugin-label">{selected.required ? t("由宿主提供，不声明外部脚本权限。") : t("声明的能力")}</p><p class="permission-list">{selected.permissions.join(' · ') || t("无外部能力")}</p></details>
-      {#if selected.commands.length}<h3 class="plugin-group">{t("插件命令")}</h3><div class="inline-actions plugin-commands">{#each selected.commands as command}<button disabled={busy || !selected.enabled || !!selected.problem} onclick={() => run(selected.id, command.id)}>{t(command.title)}</button>{/each}</div>{/if}
-      {#if selected.panels.length}<h3 class="plugin-group">{t("自定义面板")}</h3><div class="inline-actions">{#each selected.panels as p}<button disabled={busy || !selected.enabled || !!selected.problem} onclick={() => panel = { pluginId: selected.id, panelId: p.id }}>{t(p.title)}</button>{/each}</div>{/if}
+      {#if selected.commands.length}<h3 class="plugin-group">{t("插件命令")}</h3><div class="inline-actions plugin-commands">{#each selected.commands as command}<button data-h-part="button" disabled={busy || !selected.enabled || !!selected.problem} onclick={() => run(selected.id, command.id)}>{t(command.title)}</button>{/each}</div>{/if}
+      {#if selected.panels.length}<h3 class="plugin-group">{t("自定义面板")}</h3><div class="inline-actions">{#each selected.panels as p}<button data-h-part="button" disabled={busy || !selected.enabled || !!selected.problem} onclick={() => panel = { pluginId: selected.id, panelId: p.id }}>{t(p.title)}</button>{/each}</div>{/if}
       {#if busy}<p class="operation-status" role="status"><span class="spinner"><Icon name="spinner" size={18} /></span>{t("正在执行插件命令…")}</p>{/if}
       {#if report}<p class="notice" role="status" in:entrance use:animateText={report.notifications.join(' · ')}>{report.notifications.join(' · ') || t("命令已完成")}</p><details class="expander"><summary>{t("运行诊断")}</summary><p class="caption">{t("代次")} {report.generation} {t("· JS 堆")} {(report.heapBytes / 1024).toFixed(0)} {t("KiB · 注册")} {report.registrations} {t("项")}</p></details>{/if}
       {#if error}<p class="issue" role="alert" in:entrance use:animateText={error}>{error}</p>{/if}
+      {#if selected.diagnostics?.length}<details class="expander"><summary>{t("运行诊断")}</summary>{#each selected.diagnostics as diagnostic}<p class="issue">{diagnostic}</p>{/each}</details>{/if}
       {#if panel}{#key `${panel.pluginId}/${panel.panelId}`}<div class="plugin-panel"><PluginPanel pluginId={panel.pluginId} panelId={panel.panelId} onerror={message => error = message} /></div>{/key}{/if}
     </div>
   {/if}
-  <footer class="plugins-footer"><span class="plugin-label">{t("预装与外置插件统一管理 · 插件包经校验后安装")}</span><button class="text-button" onclick={directory}>{t("插件目录")}</button></footer>
+  <footer class="plugins-footer"><span class="plugin-label">{t("预装与外置插件统一管理 · 插件包经校验后安装")}</span><button data-h-part="button" class="text-button" onclick={directory}>{t("插件目录")}</button></footer>
 </div>

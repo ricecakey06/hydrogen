@@ -36,6 +36,7 @@
 </script>
 
 <script lang="ts">
+  import PluginSlot from '../../../ui.shell/frontend/components/PluginSlot.svelte';
   import { onMount, tick, untrack } from 'svelte';
   import { flip } from 'svelte/animate';
   import { i18n, t } from '../../../ui.shell/frontend/lib/i18n';
@@ -47,7 +48,7 @@
 
   interface SearchProject extends ResourceProject { categories: string[]; versions: string[] }
   interface SearchPage { hits: SearchProject[]; total_hits: number }
-  type Source = 'modrinth' | 'curseforge';
+  type Source = string;
   interface Filters { categories: string[]; gameVersions: string[]; categoryNames?: Record<string, string> }
   interface Query { query: string; gameVersion: string; category: string; loader: string; source: Source }
   let { snapshot, trail = $bindable([]), onchange }: {
@@ -61,9 +62,10 @@
   const pageSize = 20;
   const inputDelay = 300;
   const cardMoveDuration = () => matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 190;
-  const emptyQuery: Query = { query: '', gameVersion: '', category: '', loader: '', source: 'modrinth' };
-  const sources = { modrinth: 'Modrinth', curseforge: 'CurseForge' };
-  const sourceIds = Object.keys(sources) as Source[];
+  const emptyQuery: Query = { query: '', gameVersion: '', category: '', loader: '', source: 'minecraft.resources:modrinth' };
+  const sources = $derived(Object.fromEntries((snapshot?.plugins ?? []).filter(p => p.enabled && !p.problem)
+    .flatMap(p => (p.providers ?? []).filter(c => c.kind === 'resourceSource').map(c => [p.id + ':' + c.id, c.title]))));
+  const sourceIds = $derived(Object.keys(sources));
   const sourceMenuId = $props.id();
   let sourceMenuOpen = $state(false);
   let sourceControl: HTMLDivElement;
@@ -341,6 +343,8 @@
     };
   });
 </script>
+<PluginSlot {snapshot} location="resources.actions" context={{ instanceId: snapshot?.selectedInstanceId }} onchange={onchange} />
+
 
 <svelte:window onpointerdown={dismissSourceMenu} onfocusin={dismissSourceMenu} />
 
@@ -369,7 +373,7 @@
           <div class="source-badge">
             <span>{t("当前来源")}</span>
             <div class="source-control" bind:this={sourceControl}>
-              <button type="button" class="source-trigger" bind:this={sourceTrigger} aria-haspopup="menu"
+              <button data-h-part="button" type="button" class="source-trigger" bind:this={sourceTrigger} aria-haspopup="menu"
                       aria-expanded={sourceMenuOpen} aria-controls={sourceMenuOpen ? sourceMenuId : undefined}
                       aria-label={`${t("当前来源")} ${sources[query.source]}`}
                       onclick={() => sourceMenuOpen ? closeSourceMenu() : void openSourceMenu(sourceIds.indexOf(query.source))}
@@ -381,7 +385,7 @@
               {#if sourceMenuOpen}
                 <div id={sourceMenuId} class="source-menu" role="menu" aria-label={t("当前来源")}>
                   {#each sourceIds as source, index (source)}
-                    <button type="button" class="source-option" role="menuitemradio" aria-checked={query.source === source} tabindex="-1"
+                    <button data-h-part="button" type="button" class="source-option" role="menuitemradio" aria-checked={query.source === source} tabindex="-1"
                             onclick={() => { changeSource(source); closeSourceMenu(); }} onkeydown={event => sourceKeydown(event, index)}>
                       <Icon name={source} size={16} />
                       {sources[source]}
@@ -396,31 +400,31 @@
         <div class="search-bar">
           <div class="search-input">
             <Icon name="search" size={18} />
-            <input type="search" value={query.query} maxlength="160" aria-label={t("搜索模组名称")} placeholder={t("按名称搜索，例如 Sodium")} oninput={event => {
+            <input data-h-part="input-shell" type="search" value={query.query} maxlength="160" aria-label={t("搜索模组名称")} placeholder={t("按名称搜索，例如 Sodium")} oninput={event => {
               if (!(event instanceof InputEvent && event.isComposing)) changeFilters({ query: event.currentTarget.value }, inputDelay);
             }} />
           </div>
-          <button type="submit" class="primary search-submit">{t("搜索")}</button>
+          <button data-h-part="button" data-h-variant="primary" type="submit" class="primary search-submit">{t("搜索")}</button>
         </div>
       </div>
       <div class="filter-bar">
         <label class="version-filter">
           <span>{t("游戏版本")}</span>
-          <input value={query.gameVersion} maxlength="40" list="resource-game-versions" placeholder={t("全部（可手动输入）")} oninput={event => changeFilters({ gameVersion: event.currentTarget.value }, inputDelay)} />
+          <input data-h-part="input-shell" value={query.gameVersion} maxlength="40" list="resource-game-versions" placeholder={t("全部（可手动输入）")} oninput={event => changeFilters({ gameVersion: event.currentTarget.value }, inputDelay)} />
         </label>
         <datalist id="resource-game-versions">{#each filters.gameVersions as gameVersion (gameVersion)}<option value={gameVersion}></option>{/each}</datalist>
         {#if query.gameVersion.trim()}
           <label class="loader-filter" transition:fadeSlide={{ compact: true }}>
             <span>{t("加载器")}</span>
-            <select value={query.loader} onchange={event => changeFilters({ loader: event.currentTarget.value })}>
+            <select data-h-part="input-shell" value={query.loader} onchange={event => changeFilters({ loader: event.currentTarget.value })}>
               <option value="">{t("全部")}</option>
               {#each Object.entries(loaders) as [id, name] (id)}<option value={id}>{name}</option>{/each}
             </select>
           </label>
         {/if}
-        <label><span>{t("类型")}</span><select value={query.category} onchange={event => changeFilters({ category: event.currentTarget.value })}><option value="">{t("全部")}</option>{#each filters.categories as category (category)}<option value={category}>{categoryName(category)}</option>{/each}</select></label>
-        <button type="button" class="text-button reset-filters" onclick={reset}>{t("重置条件")}</button>
-        {#if filtersError}<button type="button" class="text-button" disabled={loadingFilters} onclick={loadFilters}>{t("重试加载筛选项")}</button>{/if}
+        <label><span>{t("类型")}</span><select data-h-part="input-shell" value={query.category} onchange={event => changeFilters({ category: event.currentTarget.value })}><option value="">{t("全部")}</option>{#each filters.categories as category (category)}<option value={category}>{categoryName(category)}</option>{/each}</select></label>
+        <button data-h-part="button" type="button" class="text-button reset-filters" onclick={reset}>{t("重置条件")}</button>
+        {#if filtersError}<button data-h-part="button" type="button" class="text-button" disabled={loadingFilters} onclick={loadFilters}>{t("重试加载筛选项")}</button>{/if}
       </div>
     </form>
 
@@ -438,9 +442,9 @@
       </div>
       {#if !searchError && results.hits.length}
         <nav class="pagination" aria-label={t("结果分页")}>
-          <button type="button" class="icon-button" aria-label={t("上一页")} title={t("上一页")} disabled={searching || offset === 0} onclick={() => refresh(applied, offset - pageSize)}><Icon name="back" size={16} /></button>
+          <button data-h-part="button" type="button" class="icon-button" aria-label={t("上一页")} title={t("上一页")} disabled={searching || offset === 0} onclick={() => refresh(applied, offset - pageSize)}><Icon name="back" size={16} /></button>
           <span class="muted">{t("第 {0} 页", offset / pageSize + 1)}</span>
-          <button type="button" class="icon-button" aria-label={t("下一页")} title={t("下一页")} disabled={searching || offset + pageSize >= results.total_hits || offset + pageSize > 10_000} onclick={() => refresh(applied, offset + pageSize)}><Icon name="chevron" size={16} /></button>
+          <button data-h-part="button" type="button" class="icon-button" aria-label={t("下一页")} title={t("下一页")} disabled={searching || offset + pageSize >= results.total_hits || offset + pageSize > 10_000} onclick={() => refresh(applied, offset + pageSize)}><Icon name="chevron" size={16} /></button>
         </nav>
       {/if}
     </div>
@@ -449,7 +453,7 @@
       {#if searchError}
         <div class="catalog-state" in:entrance>
           <p class="issue" role="alert">{searchError}</p>
-          <button type="button" onclick={() => refresh(lastSearch.criteria, lastSearch.offset)}>{t("重试")}</button>
+          <button data-h-part="button" type="button" onclick={() => refresh(lastSearch.criteria, lastSearch.offset)}>{t("重试")}</button>
         </div>
       {:else if !results.hits.length}
         {#if searching}
@@ -466,7 +470,7 @@
           {#each results.hits as item, index (item.project_id)}
             {@const platforms = applied.loader ? [loaders[applied.loader]] : item.categories.filter(category => Object.hasOwn(loaders, category)).map(category => loaders[category])}
             {@const gameVersion = applied.gameVersion.trim() || item.versions.filter(value => releaseVersions.has(value)).at(-1) || item.versions.at(-1)}
-            <button type="button" class="project-card" aria-labelledby={'resource-project-' + item.project_id} onclick={event => openProject(item, event.currentTarget)} animate:flip={{ duration: cardMoveDuration }} in:entrance|global={{ delay: Math.min(index, 5) * 20 }}>
+            <button data-h-part="button" type="button" class="project-card" aria-labelledby={'resource-project-' + item.project_id} onclick={event => openProject(item, event.currentTarget)} animate:flip={{ duration: cardMoveDuration }} in:entrance|global={{ delay: Math.min(index, 5) * 20 }}>
               <span class="card-heading">
                 {@render projectIcon(item.icon_url)}
                 <span class="card-identity">
@@ -522,14 +526,14 @@
             </div>
             {#if dependencyError}
               <p class="issue" role="alert">{dependencyError}</p>
-              <button type="button" class="text-button" onclick={() => dependencyRetry++}>{t("重试")}</button>
+              <button data-h-part="button" type="button" class="text-button" onclick={() => dependencyRetry++}>{t("重试")}</button>
             {:else if version?.requiredDependencies === 0 || dependencyDetails?.items.length === 0}
               <p class="muted">{t("此版本无需前置模组。")}</p>
             {:else if dependencyDetails}
               <ul class="dependency-list" in:entrance>
                 {#each dependencyDetails.items as dependency}
                   <li>
-                    <button type="button" class="dependency-row" disabled={!dependency.project} onclick={() => openDependency(dependency.project)}>
+                    <button data-h-part="button" type="button" class="dependency-row" disabled={!dependency.project} onclick={() => openDependency(dependency.project)}>
                       {@render projectIcon(dependency.iconUrl, 16)}
                       <span class="dependency-name">
                         <strong>{dependency.name ?? t("未知前置模组")}</strong>
@@ -553,7 +557,7 @@
         {#if target}
           <label class="detail-field">
             <span>{t("目标实例")}</span>
-            <select value={target.id} onchange={event => chooseTarget(event.currentTarget.value)}>
+            <select data-h-part="input-shell" value={target.id} onchange={event => chooseTarget(event.currentTarget.value)}>
               {#each instances as instance (instance.id)}
                 <option value={instance.id}>{instance.name} · {instance.gameVersion} · {loaderName(instance)}</option>
               {/each}
@@ -563,11 +567,11 @@
             <p class="muted" role="status">{t("正在获取兼容版本…")}</p>
           {:else if versionError}
             <p class="issue" role="alert">{versionError}</p>
-            <button type="button" class="text-button" onclick={() => versionRetry++}>{t("重试")}</button>
+            <button data-h-part="button" type="button" class="text-button" onclick={() => versionRetry++}>{t("重试")}</button>
           {:else if version}
             <label class="detail-field">
               <span>{t("模组版本")}</span>
-              <select value={version.id} onchange={event => chooseVersion(event.currentTarget.value)}>
+              <select data-h-part="input-shell" value={version.id} onchange={event => chooseVersion(event.currentTarget.value)}>
                 {#each versions as item (item.id)}
                   <option value={item.id}>{item.number} · {item.channel === 'release' ? t("正式版") : item.channel}</option>
                 {/each}
@@ -580,7 +584,7 @@
             {#if targetBusy && !task}<p class="muted">{t("目标实例正在运行游戏或处理任务。")}</p>{/if}
             {#if snapshot?.readOnly}<p class="muted">{t("启动器当前处于只读模式。")}</p>{/if}
             {#if version.blocked}<p class="muted">{t("此文件未开放第三方下载。")}</p>{/if}
-            <button type="button" class="primary full-width" disabled={starting || targetBusy || snapshot?.readOnly || version.blocked} onclick={download}>{starting ? t("正在提交…") : t("下载到实例")}</button>
+            <button data-h-part="button" data-h-variant="primary" type="button" class="primary full-width" disabled={starting || targetBusy || snapshot?.readOnly || version.blocked} onclick={download}>{starting ? t("正在提交…") : t("下载到实例")}</button>
           {:else}
             <p class="muted" role="status">{t("此模组没有与目标实例兼容的版本。")}</p>
           {/if}
@@ -600,7 +604,7 @@
           <p class:issue={task.phase === 'failed'} class="muted" role="status" use:animateText={task.phase + task.message}>
             {task.instanceName} · {task.phase === 'completed' ? t("模组已安装") : t(task.message)}
           </p>
-          {#if taskActive(task) && task.phase !== 'committing'}<button class="text-button" onclick={cancel}>{t("取消")}</button>{/if}
+          {#if taskActive(task) && task.phase !== 'committing'}<button data-h-part="button" class="text-button" onclick={cancel}>{t("取消")}</button>{/if}
         </div>
         {#if taskActive(task)}<DownloadProgress percent={progress.percent} indeterminate={progress.indeterminate} />{/if}
       {/if}
@@ -614,28 +618,29 @@
   .catalog { display: flex; flex-direction: column; flex: 1; min-height: 0; }
   .catalog[hidden] { display: none; }
   .search-form { flex: none; }
+  /* §6.4.1: the search panel and field need distinct surfaces. */
   .catalog-hero {
     position: relative;
     display: grid;
     gap: 12px;
     padding: 16px 20px;
     border-radius: 12px;
-    background: #f2f3f6;
+    background: var(--h-surface-sidebar);
   }
   .hero-art { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; color: var(--secondary); opacity: .1; pointer-events: none; }
   .hero-art > :global(svg) { position: absolute; right: 52px; top: -31px; transform: rotate(-12deg); }
   .hero-heading { position: relative; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-  .hero-heading h2 { font-size: 26px; font-weight: 600; line-height: 1.15; }
-  .hero-heading p { margin-top: 5px; color: var(--secondary); font-size: 13px; line-height: 1.45; }
-  .source-badge { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; white-space: nowrap; }
+  .hero-heading h2 { font-size: calc(var(--h-font-size,16px) * 1.625); font-weight: 600; line-height: 1.15; }
+  .hero-heading p { margin-top: 5px; color: var(--secondary); font-size: calc(var(--h-font-size,16px) * 0.8125); line-height: 1.45; }
+  .source-badge { display: inline-flex; align-items: center; gap: 8px; font-size: calc(var(--h-font-size,16px) * 0.75); white-space: nowrap; }
   .source-badge > span:first-child { color: var(--secondary); }
   .source-control { position: relative; }
-  .source-trigger, .source-option { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; padding: 4px 8px; font-size: 13px; box-shadow: none; }
+  .source-trigger, .source-option { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; padding: 4px 8px; font-size: calc(var(--h-font-size,16px) * 0.8125); box-shadow: none; }
   .source-trigger { min-width: 144px; border-radius: 6px; }
   .source-arrow { margin-left: auto; transform: rotate(90deg); }
-  .source-menu { position: absolute; z-index: 2; inset: calc(100% + 4px) 0 auto; display: grid; gap: 2px; padding: 4px; border: 1px solid var(--stroke); border-radius: 8px; background: #fff; box-shadow: 0 4px 12px #18202b20; }
+  .source-menu { position: absolute; z-index: 2; inset: calc(100% + 4px) 0 auto; display: grid; gap: 2px; padding: 4px; border: 1px solid var(--stroke); border-radius: 8px; background: var(--h-surface-card); box-shadow: 0 4px 12px color-mix(in srgb,var(--h-text-primary) 12%,transparent); }
   .source-option { border: 0; border-radius: 4px; text-align: left; }
-  .source-option[aria-checked='true'] { background: #eef0f3; }
+  .source-option[aria-checked='true'] { background: var(--h-surface-card); }
   .source-option:focus-visible { outline-offset: -2px; }
   .source-check { margin-left: auto; }
   .search-bar { position: relative; display: flex; gap: 8px; }
@@ -648,22 +653,22 @@
     padding: 0 10px;
     border: 1px solid var(--stroke);
     border-radius: 8px;
-    background: #f6f7f9;
+    background: color-mix(in srgb, var(--h-surface-sidebar) 67%, var(--h-surface-input));
     color: var(--secondary);
   }
-  .search-input:focus-within { outline: 2px solid #34373c; outline-offset: 2px; }
-  .search-input input { min-width: 0; border: 0; padding: 6px 0; outline: none; background: transparent; color: #17191c; }
-  .search-submit { padding-inline: 20px; box-shadow: none; font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .search-input:focus-within { outline: 2px solid var(--h-text-primary); outline-offset: 2px; }
+  .search-input input { min-width: 0; border: 0; padding: 6px 0; outline: none; background: transparent; color: var(--h-text-primary); }
+  .search-submit { padding-inline: 20px; box-shadow: none; font-size: calc(var(--h-font-size,16px) * 0.875); font-weight: 600; white-space: nowrap; }
   .filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; }
-  .filter-bar label { display: flex; align-items: center; gap: 6px; color: var(--secondary); font-size: 13px; white-space: nowrap; }
-  .filter-bar input, .filter-bar select { width: 144px; min-height: 34px; padding-block: 5px; color: #17191c; font-size: 13px; }
+  .filter-bar label { display: flex; align-items: center; gap: 6px; color: var(--secondary); font-size: calc(var(--h-font-size,16px) * 0.8125); white-space: nowrap; }
+  .filter-bar input, .filter-bar select { width: 144px; min-height: 34px; padding-block: 5px; color: var(--h-text-primary); font-size: calc(var(--h-font-size,16px) * 0.8125); }
   .filter-bar .version-filter input { width: 168px; }
   .filter-bar .loader-filter select { width: 116px; }
   .reset-filters { margin-left: auto; }
 
   .results-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 32px; margin: 12px 0 6px; }
   .results-heading, .pagination { display: flex; align-items: center; gap: 8px; }
-  .results-heading h3 { font-size: 16px; font-weight: 600; }
+  .results-heading h3 { font-size: calc(var(--h-font-size,16px) * 1); font-weight: 600; }
   .result-feedback { display: flex; align-items: center; gap: 5px; }
   .pagination { gap: 4px; white-space: nowrap; }
   .pagination button { width: 28px; height: 28px; }
@@ -679,10 +684,10 @@
     gap: 8px;
     padding: 16px;
     border-radius: 8px;
-    background: #f6f7f9;
+    background: var(--h-surface-card);
     color: var(--secondary);
     text-align: center;
-    font-size: 14px;
+    font-size: calc(var(--h-font-size,16px) * 0.875);
   }
   .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 264px), 1fr)); gap: 10px; }
   .project-card {
@@ -695,22 +700,22 @@
     box-shadow: none;
     text-align: left;
   }
-  .project-card:hover:enabled { border-color: #8c98ac; background: #f6f7f9; }
+  .project-card:hover:enabled { border-color: var(--h-text-secondary); background: var(--h-surface-card); }
   .project-card:focus-visible { outline-offset: -2px; }
   .skeleton-card { min-height: 158px; display: grid; align-content: start; gap: 12px; padding: 12px; border: 1px solid var(--stroke); border-radius: 10px; }
-  .skeleton-card span { height: 10px; width: 88%; border-radius: 4px; background: #eef0f3; }
+  .skeleton-card span { height: 10px; width: 88%; border-radius: 4px; background: var(--h-surface-card); }
   .skeleton-card span:first-child { width: 42px; height: 42px; border-radius: 8px; }
   .skeleton-card span:last-child { width: 62%; }
   .card-heading { display: flex; align-items: center; gap: 10px; min-width: 0; }
   .card-identity { flex: 1; min-width: 0; display: grid; gap: 3px; }
-  .card-arrow { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; background: #f2f3f6; color: var(--secondary); }
-  .project-icon { position: relative; flex: 0 0 42px; width: 42px; height: 42px; display: grid; place-items: center; border-radius: 8px; overflow: hidden; background: #e8ecf3; color: var(--secondary); }
-  .project-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #f6f7f9; }
+  .card-arrow { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; background: var(--h-surface-card); color: var(--secondary); }
+  .project-icon { position: relative; flex: 0 0 42px; width: 42px; height: 42px; display: grid; place-items: center; border-radius: 8px; overflow: hidden; background: var(--h-surface-card); color: var(--secondary); }
+  .project-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: var(--h-surface-card); }
   .project-icon img:not([data-loaded]) { opacity: 0; }
   .truncate { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  .project-title { font-size: 15px; font-weight: 600; }
+  .project-title { font-size: calc(var(--h-font-size,16px) * 0.9375); font-weight: 600; }
   .tags { display: flex; flex-wrap: wrap; gap: 4px; }
-  .tag { padding: 1px 6px; border-radius: 4px; background: #eef0f3; color: var(--secondary); font-size: 11px; line-height: 1.5; }
+  .tag { padding: 1px 6px; border-radius: 4px; background: var(--h-surface-card); color: var(--secondary); font-size: calc(var(--h-font-size,16px) * 0.6875); line-height: 1.5; }
   .card-identity .tags { flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
   .project-summary {
     display: -webkit-box;
@@ -721,13 +726,13 @@
     overflow: hidden;
     overflow-wrap: anywhere;
     color: var(--secondary);
-    font-size: 13px;
+    font-size: calc(var(--h-font-size,16px) * 0.8125);
     line-height: 17px;
   }
-  .compatibility, .card-footer, .card-footer > span { display: flex; align-items: center; gap: 4px; color: var(--secondary); font-size: 12px; white-space: nowrap; }
+  .compatibility, .card-footer, .card-footer > span { display: flex; align-items: center; gap: 4px; color: var(--secondary); font-size: calc(var(--h-font-size,16px) * 0.75); white-space: nowrap; }
   .compatibility { min-width: 0; }
-  .card-footer { gap: 10px; border-top: 1px solid #e2e5eb; padding-top: 6px; }
-  .card-footer .card-source { margin-left: auto; font-size: 11px; }
+  .card-footer { gap: 10px; border-top: 1px solid var(--h-surface-card); padding-top: 6px; }
+  .card-footer .card-source { margin-left: auto; font-size: calc(var(--h-font-size,16px) * 0.6875); }
 
   .details {
     flex: 1;
@@ -742,37 +747,37 @@
   .detail-main { display: grid; min-width: 0; gap: 12px; }
   .detail-overview, .required-mods, .install-panel { display: grid; min-width: 0; gap: 12px; padding: 16px; border: 1px solid var(--stroke); border-radius: 10px; }
   .detail-heading { display: flex; align-items: center; gap: 12px; }
-  .detail-heading h2 { font-size: 24px; font-weight: 600; line-height: 1.2; }
+  .detail-heading h2 { font-size: calc(var(--h-font-size,16px) * 1.5); font-weight: 600; line-height: 1.2; }
   .detail-heading h2:focus { outline: none; }
   .detail-heading .project-icon { flex-basis: 64px; width: 64px; height: 64px; }
-  .description { font-size: 14px; color: var(--secondary); line-height: 1.65; }
+  .description { font-size: calc(var(--h-font-size,16px) * 0.875); color: var(--secondary); line-height: 1.65; }
   .detail-overview .tags:empty { display: none; }
-  .overview-meta { display: grid; gap: 8px; border-top: 1px solid #e2e5eb; padding-top: 12px; color: var(--secondary); font-size: 13px; }
+  .overview-meta { display: grid; gap: 8px; border-top: 1px solid var(--h-surface-card); padding-top: 12px; color: var(--secondary); font-size: calc(var(--h-font-size,16px) * 0.8125); }
   .overview-meta > span, .install-panel h3 { display: flex; align-items: center; gap: 8px; }
   .dependency-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; }
-  .dependency-heading h3, .install-panel h3 { font-size: 16px; font-weight: 600; }
+  .dependency-heading h3, .install-panel h3 { font-size: calc(var(--h-font-size,16px) * 1); font-weight: 600; }
   .dependency-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
-  .dependency-row { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 0; border-radius: 6px; box-shadow: none; background: #f6f7f9; font-size: 14px; text-align: left; }
-  .dependency-row:hover:enabled { background: #eef0f3; }
-  .dependency-row:disabled { color: #17191c; }
+  .dependency-row { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 0; border-radius: 6px; box-shadow: none; background: var(--h-surface-card); font-size: calc(var(--h-font-size,16px) * 0.875); text-align: left; }
+  .dependency-row:hover:enabled { background: var(--h-surface-card); }
+  .dependency-row:disabled { color: var(--h-text-primary); }
   .dependency-name { flex: 1; min-width: 0; }
   .dependency-arrow { color: var(--secondary); }
   .dependency-list .project-icon { flex-basis: 28px; width: 28px; height: 28px; border-radius: 6px; }
-  .dependency-list small { display: block; margin-top: 2px; color: var(--secondary); font-size: 12px; }
+  .dependency-list small { display: block; margin-top: 2px; color: var(--secondary); font-size: calc(var(--h-font-size,16px) * 0.75); }
   .dependency-loading { margin: 0; }
   .required-mods .text-button { justify-self: start; }
-  .install-panel { background: #f6f7f9; }
-  .detail-field { display: grid; min-width: 0; gap: 6px; font-size: 13px; }
-  .detail-field select { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 14px; }
-  .install-file { padding: 8px 10px; border-radius: 6px; background: #eef0f3; }
-  .filename { font-size: 13px; }
-  .task-status { padding: 8px 12px; border: 1px solid var(--stroke); border-radius: 8px; background: #fff; }
+  .install-panel { background: var(--h-surface-card); }
+  .detail-field { display: grid; min-width: 0; gap: 6px; font-size: calc(var(--h-font-size,16px) * 0.8125); }
+  .detail-field select { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: calc(var(--h-font-size,16px) * 0.875); }
+  .install-file { padding: 8px 10px; border-radius: 6px; background: var(--h-surface-card); }
+  .filename { font-size: calc(var(--h-font-size,16px) * 0.8125); }
+  .task-status { padding: 8px 12px; border: 1px solid var(--stroke); border-radius: 8px; background: var(--h-surface-card); }
   .task-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   @media (prefers-reduced-motion: no-preference) {
     .catalog:not([hidden]) { animation: catalog-in 200ms ease-out both; }
     .skeleton-card span { animation: skeleton-pulse 850ms ease-in-out var(--skeleton-delay) infinite alternate; }
     .project-card { transition: translate 160ms ease-out, box-shadow 160ms ease-out, background 160ms ease-out, border-color 160ms ease-out; }
-    .project-card:hover:enabled { translate: 0 -2px; box-shadow: 0 4px 8px #18202b12; }
+    .project-card:hover:enabled { translate: 0 -2px; box-shadow: 0 4px 8px color-mix(in srgb,var(--h-text-primary) 12%,transparent); }
     .project-card:active:enabled { translate: 0 1px; }
     .card-arrow { transition: translate 160ms ease-out; }
     .project-card:hover .card-arrow { translate: 2px 0; }

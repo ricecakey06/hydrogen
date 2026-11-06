@@ -1,4 +1,6 @@
 <script lang="ts">
+  import PluginSlot from '../../../ui.shell/frontend/components/PluginSlot.svelte';
+  import PluginContextMenu from '../../../ui.shell/frontend/components/PluginContextMenu.svelte';
   import { t, i18n } from '../../../ui.shell/frontend/lib/i18n';
   import { onDestroy } from 'svelte';
   import { action, errorMessage, taskActive, type InstanceInfo, type Snapshot, type ModInfo, type ModRef } from '../../../ui.shell/frontend/lib/api';
@@ -141,6 +143,8 @@
   }
   function dragEnd(event: PointerEvent) { if (event.pointerId !== drag?.pointer) return; if (drag.active) { lastDrag = performance.now(); if (listElement.hasPointerCapture(event.pointerId)) listElement.releasePointerCapture(event.pointerId); } drag = null; box = null; }
 </script>
+<PluginSlot {snapshot} location="mods.toolbar" context={{ instanceId: instance?.id, selectedModIds: selected, selectedMods: selectedItems.map(reference) }} onchange={onchange} />
+
 <svelte:window onpointermove={dragMove} onpointerup={dragEnd} onpointercancel={dragEnd} />
 <div class="mods-page" role="presentation" onkeydown={selectionKeydown}>
   <div class="mods-content">
@@ -148,13 +152,13 @@
   <div class="mods-toolbar">
     <div class="mod-tabs" role="group" aria-label={t("模组分类")}>
       {#each tabs as tab (tab.id)}
-        <button class:active={category === tab.id} aria-pressed={category === tab.id} onclick={() => changeTab(tab.id)}>
+        <button data-h-part="nav-item" class:active={category === tab.id} aria-pressed={category === tab.id} onclick={() => changeTab(tab.id)}>
           {tab.label}<span class="mod-tab-count">{tab.id === 'updates' && updates === null ? '—' : categories[tab.id].length}</span>
         </button>
       {/each}
     </div>
-    <input class="mod-search" bind:value={query} oninput={() => { page = 0; clearSelection(); }} maxlength="100" placeholder={t("搜索本地模组的中英文名、ID 或文件名")} aria-label={t("搜索本地模组")} />
-    <div class="inline-actions compact-actions"><button disabled={loading || checkingUpdates} onclick={() => refresh()}><Icon name="refresh" size={16} />{t("刷新")}</button><button disabled={busy || inUse} onclick={() => operate('modsImport')}><Icon name="plus" size={16} />{t("导入模组…")}</button><button onclick={() => operate('openMods')}><Icon name="folder" size={16} />{t("打开文件夹")}</button><button disabled={loading || !filtered.length} onclick={() => selected = filtered.flatMap(m => m.fileName ? [m.fileName] : [])}>{t("全选")}</button></div>
+    <input data-h-part="input-shell" class="mod-search" bind:value={query} oninput={() => { page = 0; clearSelection(); }} maxlength="100" placeholder={t("搜索本地模组的中英文名、ID 或文件名")} aria-label={t("搜索本地模组")} />
+    <div class="inline-actions compact-actions"><button data-h-part="button" disabled={loading || checkingUpdates} onclick={() => refresh()}><Icon name="refresh" size={16} />{t("刷新")}</button><button data-h-part="button" disabled={busy || inUse} onclick={() => operate('modsImport')}><Icon name="plus" size={16} />{t("导入模组…")}</button><button data-h-part="button" onclick={() => operate('openMods')}><Icon name="folder" size={16} />{t("打开文件夹")}</button><button data-h-part="button" disabled={loading || !filtered.length} onclick={() => selected = filtered.flatMap(m => m.fileName ? [m.fileName] : [])}>{t("全选")}</button></div>
     <p class="caption small">{category === 'duplicates' ? t("列出文件内容相同或声明相同模组 ID 的文件。") : category === 'updates' ? t("从 Modrinth 查找适配此实例的更新正式版。") : t("点击卡片选择，再次点击取消；按住左键框选可切换选中状态。可将模组文件拖入窗口。")}</p>
   </div>
   {#if loading}<p class="caption" role="status">{t("正在读取本地模组…")}</p>{/if}
@@ -163,7 +167,7 @@
     <div class="mod-update-status">
       <div class="field-row">
         <p role="status">{t("模组更新")} · {updateProgress.status}</p>
-        <button class="text-button" disabled={updateTask.phase === 'committing'} onclick={() => cancelUpdate(updateTask.id)}>{t("取消更新")}</button>
+        <button data-h-part="button" class="text-button" disabled={updateTask.phase === 'committing'} onclick={() => cancelUpdate(updateTask.id)}>{t("取消更新")}</button>
       </div>
       <DownloadProgress percent={updateProgress.percent} indeterminate={updateProgress.indeterminate} />
     </div>
@@ -177,9 +181,10 @@
   <div class="mod-list" class:has-selection={selectedItems.length > 0} bind:this={listElement} role="presentation" onpointerdown={dragStart}>
     {#each displayed as mod (mod.fileName ?? mod.id)}
       {@const nextVersion = mod.sha1 ? updates?.[mod.sha1] : undefined}
-      <article class="mod-card" class:selected={!!mod.fileName && selected.includes(mod.fileName)} data-mod-file={mod.fileName ?? undefined}>
+      <PluginContextMenu {snapshot} location="mods.contextMenu" context={{ instanceId: instance?.id, selectedModIds: selected, selectedMods: selectedItems.map(reference) }} {onchange} onopen={() => { if (mod.fileName && !selected.includes(mod.fileName)) selected = [mod.fileName]; }}>
+      <article data-h-part="card" class="mod-card" class:selected={!!mod.fileName && selected.includes(mod.fileName)} data-mod-file={mod.fileName ?? undefined}>
         {#if mod.fileName && selected.includes(mod.fileName)}<span class="mod-selected-mark" aria-hidden="true"><Icon name="check" size={12} width={2.5} /></span>{/if}
-        <button class="mod-row-main" aria-pressed={!!mod.fileName && selected.includes(mod.fileName)} onclick={event => toggle(mod, event)}>
+        <button data-h-part="button" class="mod-row-main" aria-pressed={!!mod.fileName && selected.includes(mod.fileName)} onclick={event => toggle(mod, event)}>
           {#if mod.icon}<img src={mod.icon} alt="" width="42" height="42" loading="lazy" draggable="false" />{:else}<span class="mod-icon"><Icon name="puzzle" size={27} /></span>{/if}
           <span class="mod-card-text">
             <span class="mod-title">{$i18n.locale.startsWith('zh') ? mod.chineseName ?? mod.englishName : mod.englishName}</span>
@@ -191,19 +196,20 @@
         </button>
         <div class="mod-actions">
           {#if category === 'updates' && nextVersion}
-            <button class="primary mod-update-button" disabled={updateLocked} onclick={() => updateMods([mod])}>{t("更新")}</button>
+            <button data-h-part="button" data-h-variant="primary" class="primary mod-update-button" disabled={updateLocked} onclick={() => updateMods([mod])}>{t("更新")}</button>
           {/if}
-          <button class="text-button" disabled={busy || inUse} onclick={() => operate('modsEnable', { files: [reference(mod)], enabled: !mod.enabled })}>{mod.enabled ? t("禁用") : t("启用")}</button>
-          <button class="text-button" onclick={() => { editingName = mod.fileName ?? ''; newName = mod.chineseName ?? ''; }}>{t("中文名")}</button>
+          <button data-h-part="button" class="text-button" disabled={busy || inUse} onclick={() => operate('modsEnable', { files: [reference(mod)], enabled: !mod.enabled })}>{mod.enabled ? t("禁用") : t("启用")}</button>
+          <button data-h-part="button" class="text-button" onclick={() => { editingName = mod.fileName ?? ''; newName = mod.chineseName ?? ''; }}>{t("中文名")}</button>
         </div>
-        {#if editingName && editingName === mod.fileName}<div class="mod-name-editor input-action"><input aria-label={t("模组中文名")} maxlength="100" bind:value={newName} placeholder={t("中文名称；留空恢复默认")} /><button disabled={busy} onclick={async () => { await operate('modsName', { file: reference(mod), name: newName }); editingName = ''; }}>{t("保存")}</button></div>{/if}
+        {#if editingName && editingName === mod.fileName}<div class="mod-name-editor input-action"><input data-h-part="input-shell" aria-label={t("模组中文名")} maxlength="100" bind:value={newName} placeholder={t("中文名称；留空恢复默认")} /><button data-h-part="button" disabled={busy} onclick={async () => { await operate('modsName', { file: reference(mod), name: newName }); editingName = ''; }}>{t("保存")}</button></div>{/if}
       </article>
+      </PluginContextMenu>
     {:else}
       {#if !loading && !error}
         {#if category === 'updates' && checkingUpdates}
           <div class="empty-state" role="status">{t("正在检查模组更新…")}</div>
         {:else if category === 'updates' && updateError}
-          <div class="mod-update-error"><p class="issue" role="alert">{updateError}</p><button onclick={checkUpdates}>{t("重试")}</button></div>
+          <div class="mod-update-error"><p class="issue" role="alert">{updateError}</p><button data-h-part="button" onclick={checkUpdates}>{t("重试")}</button></div>
         {:else if category === 'updates' && !resourcesAvailable}
           <div class="empty-state">{t("启用资源下载插件后可检查更新。")}</div>
         {:else}
@@ -220,20 +226,20 @@
         <p class="mod-selection-count" role="status"><span class="mod-selection-number">{selectedItems.length}</span><span>{t("项已选")}</span></p>
         <div class="mod-selection-actions">
           {#if category === 'updates'}
-            <button class="selection-update" disabled={updateLocked || !selectedUpdates.length} onclick={() => updateMods(selectedUpdates)}><Icon name="download" size={17} />{t("更新所选")}</button>
+            <button data-h-part="button" class="selection-update" disabled={updateLocked || !selectedUpdates.length} onclick={() => updateMods(selectedUpdates)}><Icon name="download" size={17} />{t("更新所选")}</button>
           {/if}
-          <button disabled={!canEnable || busy || loading || inUse} onclick={() => operate('modsEnable', { files: selectedItems.filter(mod => !mod.enabled).map(reference), enabled: true })}><Icon name="circle-check" size={18} />{t("启用")}</button>
-          <button disabled={!canDisable || busy || loading || inUse} onclick={() => operate('modsEnable', { files: selectedItems.filter(mod => mod.enabled).map(reference), enabled: false })}><Icon name="circle-minus" size={18} />{t("禁用")}</button>
-          <button class="selection-delete" disabled={busy || loading || inUse} onclick={removeSelected}><Icon name="trash" size={18} />{t("删除")}</button>
+          <button data-h-part="button" disabled={!canEnable || busy || loading || inUse} onclick={() => operate('modsEnable', { files: selectedItems.filter(mod => !mod.enabled).map(reference), enabled: true })}><Icon name="circle-check" size={18} />{t("启用")}</button>
+          <button data-h-part="button" disabled={!canDisable || busy || loading || inUse} onclick={() => operate('modsEnable', { files: selectedItems.filter(mod => mod.enabled).map(reference), enabled: false })}><Icon name="circle-minus" size={18} />{t("禁用")}</button>
+          <button data-h-part="button" class="selection-delete" disabled={busy || loading || inUse} onclick={removeSelected}><Icon name="trash" size={18} />{t("删除")}</button>
           <span class="mod-selection-divider" aria-hidden="true"></span>
-          <button class="selection-close" aria-label={t("取消选择")} title={t("取消选择（Esc）")} onclick={() => clearSelection(true)}><Icon name="close" size={17} /></button>
+          <button data-h-part="button" class="selection-close" aria-label={t("取消选择")} title={t("取消选择（Esc）")} onclick={() => clearSelection(true)}><Icon name="close" size={17} /></button>
         </div>
       </div>
     </div>
   {/if}
   </div>
   {#if filtered.length > 50 || inUse}<div class="mods-footer">
-    {#if filtered.length > 50}<div class="field-row mod-pagination"><button disabled={page === 0} onclick={() => changePage(page - 1)}>{t("上一页")}</button><span class="caption">{page + 1} / {Math.ceil(filtered.length / 50)}</span><button disabled={(page + 1) * 50 >= filtered.length} onclick={() => changePage(page + 1)}>{t("下一页")}</button></div>{/if}
+    {#if filtered.length > 50}<div class="field-row mod-pagination"><button data-h-part="button" disabled={page === 0} onclick={() => changePage(page - 1)}>{t("上一页")}</button><span class="caption">{page + 1} / {Math.ceil(filtered.length / 50)}</span><button data-h-part="button" disabled={(page + 1) * 50 >= filtered.length} onclick={() => changePage(page + 1)}>{t("下一页")}</button></div>{/if}
     {#if inUse}<p class="caption">{t("此实例正在安装、启动或运行，文件修改暂不可用。")}</p>{/if}
   </div>{/if}
 </div>

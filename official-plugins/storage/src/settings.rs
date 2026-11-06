@@ -4,6 +4,8 @@ use std::{collections::BTreeMap, path::Path};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Settings {
+    #[serde(default)]
+    pub theme: hydrogen_plugin_sdk::contracts::ThemeChoice,
     #[serde(default = "default_locale")]
     pub locale: String,
     #[serde(default)]
@@ -31,6 +33,7 @@ fn default_locale() -> String {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            theme: Default::default(),
             locale: default_locale(),
             game_directory: None,
             isolate_game_directory: None,
@@ -243,6 +246,9 @@ impl Settings {
     }
 
     pub fn validate(&self) -> Result<()> {
+        if !self.theme.is_valid() {
+            return Err(ApiError::new("THEME_INVALID", "主题选择无效。"));
+        }
         if self.locale.len() > 35
             || self.locale.is_empty()
             || !self
@@ -257,8 +263,10 @@ impl Settings {
             || !(320..=16384).contains(&self.window_width)
             || !(240..=16384).contains(&self.window_height)
             || !["minimize", "keep"].contains(&self.after_launch.as_str())
-            || !["official", "bmclapi"].contains(&self.download_source.as_str())
-            || !["microsoft", "offline"].contains(&self.account_mode.as_str())
+            || (!["official", "bmclapi"].contains(&self.download_source.as_str())
+                && !provider_id(&self.download_source))
+            || (!["microsoft", "offline"].contains(&self.account_mode.as_str())
+                && !provider_id(&self.account_mode))
         {
             return Err(ApiError::new(
                 "INVALID_SETTINGS",
@@ -315,4 +323,15 @@ impl Settings {
     pub fn enabled(&self, id: &str) -> bool {
         self.modules.get(id).copied().unwrap_or(true)
     }
+}
+
+fn provider_id(value: &str) -> bool {
+    value.len() <= 201
+        && value.split_once(':').is_some_and(|(a, b)| {
+            !a.is_empty()
+                && !b.is_empty()
+                && a.bytes()
+                    .chain(b.bytes())
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'.' || c == b'-')
+        })
 }

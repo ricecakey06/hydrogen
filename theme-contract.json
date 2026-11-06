@@ -1,0 +1,202 @@
+{
+  "themeVersion": 1,
+  "firstSupportedVersion": "0.2.7",
+  "tokens": {
+    "--h-surface-canvas": {
+      "light": "#ffffff",
+      "dark": "#191d25"
+    },
+    "--h-surface-sidebar": {
+      "light": "#f2f3f6",
+      "dark": "#12161e"
+    },
+    "--h-surface-card": {
+      "light": "#ffffff",
+      "dark": "#252b36"
+    },
+    "--h-surface-popup": {
+      "light": "#fafbfc",
+      "dark": "#252b36"
+    },
+    "--h-surface-input": {
+      "light": "#ffffff",
+      "dark": "#1b202a"
+    },
+    "--h-text-primary": {
+      "light": "#17191c",
+      "dark": "#edf1f7"
+    },
+    "--h-text-secondary": {
+      "light": "#62666e",
+      "dark": "#b7c0ce"
+    },
+    "--h-text-disabled": {
+      "light": "#747982",
+      "dark": "#9aa6b7"
+    },
+    "--h-border": {
+      "light": "#cdd1d6",
+      "dark": "#566273"
+    },
+    "--h-control-hover": {
+      "light": "#eceff3",
+      "dark": "#333d4d"
+    },
+    "--h-control-active": {
+      "light": "#dce2e9",
+      "dark": "#405068"
+    },
+    "--h-selection": {
+      "light": "#e5e8ed",
+      "dark": "#344157"
+    },
+    "--h-primary": {
+      "light": "#292c32",
+      "dark": "#d6e2f4"
+    },
+    "--h-on-primary": {
+      "light": "#ffffff",
+      "dark": "#151c27"
+    },
+    "--h-primary-hover": {
+      "light": "#41454d",
+      "dark": "#b9cce6"
+    },
+    "--h-focus-ring": {
+      "light": "#34373c",
+      "dark": "#a9cfff"
+    },
+    "--h-control-border": {
+      "light": "#8b8f98",
+      "dark": "#697586"
+    },
+    "--h-danger": {
+      "light": "#b42318",
+      "dark": "#ffb4a9"
+    },
+    "--h-danger-surface": {
+      "light": "#fff5f4",
+      "dark": "#431f24"
+    },
+    "--h-success": {
+      "light": "#37613c",
+      "dark": "#a5ddb0"
+    },
+    "--h-progress": {
+      "light": "#34373c",
+      "dark": "#bbd6ff"
+    },
+    "--h-scrollbar": {
+      "light": "#69717f99",
+      "dark": "#a1adc099"
+    },
+    "--h-font-body": {
+      "light": "'Hydrogen MiSans','Microsoft YaHei UI',sans-serif",
+      "dark": "'Hydrogen MiSans','Microsoft YaHei UI',sans-serif"
+    },
+    "--h-font-size": {
+      "light": "16px",
+      "dark": "16px"
+    },
+    "--h-font-weight": {
+      "light": "400",
+      "dark": "400"
+    },
+    "--h-line-height": {
+      "light": "1.5",
+      "dark": "1.5"
+    },
+    "--h-space": {
+      "light": "12px",
+      "dark": "12px"
+    },
+    "--h-page-padding": {
+      "light": "24px",
+      "dark": "24px"
+    },
+    "--h-radius": {
+      "light": "8px",
+      "dark": "8px"
+    },
+    "--h-card-radius": {
+      "light": "12px",
+      "dark": "12px"
+    },
+    "--h-shadow": {
+      "light": "0 2px 4px #18202b12",
+      "dark": "0 2px 6px #0004"
+    },
+    "--h-sidebar-width": {
+      "light": "239px",
+      "dark": "239px"
+    },
+    "--h-sidebar-collapsed-width": {
+      "light": "72px",
+      "dark": "72px"
+    },
+    "--h-titlebar-height": {
+      "light": "47px",
+      "dark": "47px"
+    }
+  },
+  "parts": [
+    "titlebar",
+    "brand",
+    "brand-image",
+    "sidebar",
+    "nav-item",
+    "content",
+    "page",
+    "page-heading",
+    "card",
+    "button",
+    "input-shell"
+  ],
+  "variants": [
+    "primary",
+    "launch",
+    "danger",
+    "secondary",
+    "icon"
+  ],
+  "scopes": [
+    "popup"
+  ],
+  "pages": [
+    "home",
+    "versions",
+    "instance",
+    "profiles",
+    "settings",
+    "downloads",
+    "crash",
+    "resources",
+    "plugin"
+  ],
+  "sidebar": [
+    "expanded",
+    "collapsed"
+  ],
+  "slots": [
+    "window.background",
+    "content.background",
+    "sidebar.background",
+    "titlebar.decoration",
+    "sidebar.decoration",
+    "content.decoration"
+  ],
+  "atRules": [
+    "media",
+    "supports",
+    "font-face",
+    "keyframes"
+  ],
+  "images": [
+    "png",
+    "jpeg",
+    "webp"
+  ],
+  "fonts": [
+    "woff2"
+  ]
+}

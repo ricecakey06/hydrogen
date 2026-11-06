@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 3,
+  "apiVersion": 2,
+  "id": "example.my-theme",
+  "name": "我的主题",
+  "version": "1.0.0",
+  "runtime": "javascript",
+  "entry": "main.js",
+  "permissions": ["theme.contribute"],
+  "contributes": {
+    "themes": [{
+      "id": "custom",
+      "title": "我的主题",
+      "themeVersion": 1,
+      "variants": { "light": "themes/light.json", "dark": "themes/dark.json" }
+    }]
+  }
+}

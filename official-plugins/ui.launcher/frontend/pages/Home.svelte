@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PluginSlot from '../../../ui.shell/frontend/components/PluginSlot.svelte';
   import { t } from '../../../ui.shell/frontend/lib/i18n';
   import { animateText, entrance } from '../../../ui.shell/frontend/lib/motion';
   import { taskActive, type Snapshot } from '../../../ui.shell/frontend/lib/api';
@@ -27,19 +28,22 @@
   const canLaunch = $derived(preparing || (selected?.isInstalled && account?.status === 'signedIn' && !loginTask && launch?.phase !== 'running' && !snapshot?.tasks.some(t => t.instanceId === selected?.id && taskActive(t))));
   const status = $derived(downloading ? t("游戏文件正在下载，可点击右上角查看进度") : launchMessage || account?.detail || '');
 </script>
+<PluginSlot {snapshot} location="home.widgets" context={{ instanceId: snapshot?.selectedInstanceId }} />
+<PluginSlot {snapshot} location="home.actions" context={{ instanceId: snapshot?.selectedInstanceId }} />
+
 <div class="home">
   <div class="avatar" in:entrance|global><PlayerAvatar skin={account?.skin} size={88} /></div>
-  {#if account?.playerName && !login}<div class="player-name" in:entrance|global={{ delay: 30 }}><span use:animateText={account.playerName}>{account.playerName}</span>{#if account?.mode === 'offline'}<button class="icon-button" aria-label={t("管理档案")} onclick={onsettings}><Icon name="settings" size={20} /></button>{:else if account.status === 'cached' && !loginTask}<button class="text-button" onclick={onlogin}>{t("重新登录")}</button>{/if}</div>
-  {:else if login}<div class="signing-in" in:entrance><span>{t("正在浏览器中登录")}</span><button class="text-button" onclick={() => oncancel(login.id)}>{t("取消")}</button></div>
-  {:else}<div class="signin-slot" in:entrance|global={{ delay: 30 }}><button class="signin" disabled={!snapshot || !!loginTask} onclick={onlogin}>{account?.mode === 'offline' ? t("登录离线账号") : t("登录微软账号")}</button></div>{/if}
+  {#if account?.playerName && !login}<div class="player-name" in:entrance|global={{ delay: 30 }}><span use:animateText={account.playerName}>{account.playerName}</span>{#if account?.mode === 'offline'}<button data-h-part="button" class="icon-button" aria-label={t("管理档案")} onclick={onsettings}><Icon name="settings" size={20} /></button>{:else if account.status === 'cached' && !loginTask}<button data-h-part="button" class="text-button" onclick={onlogin}>{t("重新登录")}</button>{/if}</div>
+  {:else if login}<div class="signing-in" in:entrance><span>{t("正在浏览器中登录")}</span><button data-h-part="button" class="text-button" onclick={() => oncancel(login.id)}>{t("取消")}</button></div>
+  {:else}<div class="signin-slot" in:entrance|global={{ delay: 30 }}><button data-h-part="button" class="signin" disabled={!snapshot || !!loginTask} onclick={onlogin}>{account?.mode === 'offline' ? t("登录离线账号") : t("登录微软账号")}</button></div>{/if}
   <p class="version" in:entrance|global={{ delay: 50 }}><span class="motion-text" use:animateText={versionText}>{versionText}</span></p>
-  {#if downloads.length}<div class="downloads-slot"><ProgressRing progress={overall.indeterminate ? null : overall.percent / 100} size={50} /><button class="icon-button downloads-entry" aria-label={downloadActionName} title={downloadActionName} onclick={ondownloads}><Icon name="download" size={24} /></button></div>{/if}
+  {#if downloads.length}<div class="downloads-slot"><ProgressRing progress={overall.indeterminate ? null : overall.percent / 100} size={50} /><button data-h-part="button" class="icon-button downloads-entry" aria-label={downloadActionName} title={downloadActionName} onclick={ondownloads}><Icon name="download" size={24} /></button></div>{/if}
   <div class="launch-slot" in:entrance|global={{ delay: 80 }}>
-    <button class="launch" aria-label={preparing ? t("取消启动") : t("启动游戏")} disabled={!canLaunch} onclick={() => preparing && launch ? oncancel(launch.id) : onlaunch()}>
+    <button data-h-part="button" data-h-variant="launch" class="launch" aria-label={preparing ? t("取消启动") : t("启动游戏")} disabled={!canLaunch} onclick={() => preparing && launch ? oncancel(launch.id) : onlaunch()}>
       <Icon name={preparing ? 'stop' : 'play'} size={48} width={3.5} />
       {#if preparing}<ProgressRing progress={launchProgress} />{/if}
     </button>
   </div>
-  {#if status}<p class="home-status" class:failed={launch?.phase === 'failed' && !downloading} role="status" in:entrance><span class="motion-text" use:animateText={t(status)} title={t(launch?.phase === 'preparing' ? preparation.detail : status)}>{t(status)}</span>{#if launch?.phase === 'failed' && launch.logPath}{#if launch.crashReport || launch.crashError}<button class="text-button" onclick={() => oncrash(launch.id)}>{t("查看崩溃建议")}</button>{:else}<button class="text-button" onclick={() => onlogs(launch.id)}>{t("打开日志")}</button>{/if}{/if}</p>{/if}
+  {#if status}<p class="home-status" class:failed={launch?.phase === 'failed' && !downloading} role="status" in:entrance><span class="motion-text" use:animateText={t(status)} title={t(launch?.phase === 'preparing' ? preparation.detail : status)}>{t(status)}</span>{#if launch?.phase === 'failed' && launch.logPath}{#if launch.crashReport || launch.crashError}<button data-h-part="button" class="text-button" onclick={() => oncrash(launch.id)}>{t("查看崩溃建议")}</button>{:else}<button data-h-part="button" class="text-button" onclick={() => onlogs(launch.id)}>{t("打开日志")}</button>{/if}{/if}</p>{/if}
   <p class="launch-label">{preparing ? t("取消启动") : t("启动游戏")}</p>
 </div>

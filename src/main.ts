@@ -1,5 +1,6 @@
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import './fonts.css';
+import './theme-protection.css';
 
 document.addEventListener('contextmenu', event => {
  const target = event.target;

@@ -56,11 +56,15 @@ pub struct Appearance {
     pub rounded: bool,
 }
 
-pub fn apply(window: &WebviewWindow, glass: &mut super::glass::State) -> Appearance {
+pub fn apply(window: &WebviewWindow, glass: &mut super::glass::State, opaque: bool) -> Appearance {
     #[cfg(windows)]
     {
         let rounded = clip(window);
-        if let Some(reason) = solid_reason() {
+        if let Some(reason) = if opaque {
+            Some("用户选择不透明材质")
+        } else {
+            solid_reason()
+        } {
             glass.disable();
             return Appearance {
                 material: "solid",
@@ -92,7 +96,7 @@ pub fn apply(window: &WebviewWindow, glass: &mut super::glass::State) -> Appeara
     }
     #[cfg(not(windows))]
     {
-        let _ = (window, glass);
+        let _ = (window, glass, opaque);
         Appearance {
             material: "solid",
             reason: "当前环境不支持系统背景模糊",

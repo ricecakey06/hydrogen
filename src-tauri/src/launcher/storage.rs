@@ -10,6 +10,8 @@ use std::{
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Settings {
+    #[serde(default)]
+    pub theme: crate::plugins::themes::Choice,
     #[serde(default = "default_locale")]
     pub locale: String,
     #[serde(default)]
@@ -37,6 +39,7 @@ fn default_locale() -> String {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            theme: Default::default(),
             locale: default_locale(),
             game_directory: None,
             isolate_game_directory: None,

@@ -65,11 +65,22 @@ pub fn geometry(window: &WebviewWindow, core: &Launcher) -> Result<Option<Window
     )?)?)
 }
 pub fn apply(window: &WebviewWindow, core: &Launcher) -> Result<Appearance> {
+    apply_preferences(
+        window,
+        core,
+        core.lease().settings.theme.material == "opaque",
+    )
+}
+pub fn apply_preferences(
+    window: &WebviewWindow,
+    core: &Launcher,
+    opaque: bool,
+) -> Result<Appearance> {
     Ok(serde_json::from_value(call(
         window,
         core,
         "apply",
-        serde_json::json!({}),
+        serde_json::json!({"opaque":opaque}),
     )?)?)
 }
 pub fn attach_resize(window: &WebviewWindow, core: Arc<Launcher>) {

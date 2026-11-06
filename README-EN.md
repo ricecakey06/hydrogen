@@ -72,6 +72,8 @@ Legacy data is previewed and copied through Import legacy data in settings, leav
 
 You can install, upgrade, enable, disable, uninstall, and validate and reload plugins in the launcher. Restarting the same distribution does not restore plugins you have uninstalled. Native plugins have process-level privileges, so install plugins only from trusted sources.
 
+[Plugin development guide](docs/PLUGINS.md) · [Theme author guide](docs/THEMES.md)
+
 ## Feedback
 
 If you encounter a problem, please open an issue. Include the launcher version, operating system, Java version, steps to reproduce the problem, and logs with personal information and credentials removed. For game launch issues, also include the game version and any external plugins.

@@ -38,15 +38,15 @@
       <p class="crash-description">{t("以下是根据本次日志推测的原因，可按建议逐项排查。")}</p>
     </div>
     <div class="crash-actions">
-      <button class="primary" disabled={!!pending || !(report?.logPath || task.logPath)} onclick={openLog}>{pending === 'log' ? t("正在打开…") : t("打开崩溃日志")}</button>
-      <button disabled={!!pending || !report} onclick={exportReport}>{pending === 'export' ? t("正在导出…") : t("导出崩溃报告")}</button>
+      <button data-h-part="button" data-h-variant="primary" class="primary" disabled={!!pending || !(report?.logPath || task.logPath)} onclick={openLog}>{pending === 'log' ? t("正在打开…") : t("打开崩溃日志")}</button>
+      <button data-h-part="button" disabled={!!pending || !report} onclick={exportReport}>{pending === 'export' ? t("正在导出…") : t("导出崩溃报告")}</button>
     </div>
     {#if error}<p class="issue crash-feedback" role="alert">{error}</p>{/if}
     {#if exported}<p class="notice crash-feedback" role="status">{t("报告已导出到：")}<span class="path-label">{exported}</span></p>{/if}
     <div class="scroll-pane crash-scroll">
       {#if report}
         {#each report.causes as cause (cause.id)}
-          <section class="crash-cause" aria-label={t(cause.title)}>
+          <section data-h-part="card" class="crash-cause" aria-label={t(cause.title)}>
             <h3>{t(cause.title)}</h3>
             <p>{t(cause.summary)}</p>
             <ol>{#each cause.suggestions as suggestion}<li>{t(suggestion)}</li>{/each}</ol>
@@ -59,16 +59,16 @@
           {#each report.notes as note}<p class="caption">{t(note)}</p>{/each}
         </details>
       {:else}
-        <section class="crash-cause">
+        <section data-h-part="card" class="crash-cause">
           <h3>{t("暂时无法生成分析报告")}</h3>
           <p>{t("仍可打开本次游戏日志，查看末尾异常信息。")}</p>
           <p class="caption">{t(task.crashError) || t("请在插件管理中启用“游戏崩溃分析”，下次异常退出时会自动分析。")}</p>
         </section>
       {/if}
     </div>
-    <button class="text-button crash-back" onclick={onhome}>{t("返回启动页面")}</button>
+    <button data-h-part="button" class="text-button crash-back" onclick={onhome}>{t("返回启动页面")}</button>
   {:else}
     <div class="empty-state">{t("本次会话还没有可查看的崩溃记录。")}</div>
-    <button onclick={onhome}>{t("返回启动页面")}</button>
+    <button data-h-part="button" onclick={onhome}>{t("返回启动页面")}</button>
   {/if}
 </div>

@@ -39,6 +39,43 @@ pub use serde_json;
 
 /// Basic error values for native implementations, independent of the launcher crate.
 pub mod contracts {
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+    #[serde(rename_all = "camelCase", deny_unknown_fields)]
+    pub struct ThemeChoice {
+        pub id: String,
+        pub mode: String,
+        pub material: String,
+    }
+    impl Default for ThemeChoice {
+        fn default() -> Self {
+            Self {
+                id: "builtin:default".into(),
+                mode: "system".into(),
+                material: "auto".into(),
+            }
+        }
+    }
+    impl ThemeChoice {
+        pub fn is_valid(&self) -> bool {
+            let id = |id: &str| {
+                !id.is_empty()
+                    && id.len() <= 100
+                    && id.as_bytes()[0].is_ascii_lowercase()
+                    && id.bytes().all(|c| {
+                        c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, b'.' | b'-')
+                    })
+                    && !id.contains("..")
+                    && !id.ends_with('.')
+            };
+            ["light", "dark", "system"].contains(&self.mode.as_str())
+                && ["auto", "opaque"].contains(&self.material.as_str())
+                && (self.id == "builtin:default"
+                    || self
+                        .id
+                        .split_once(':')
+                        .is_some_and(|(p, t)| p != "builtin" && id(p) && id(t)))
+        }
+    }
     #[derive(Debug)]
     pub struct ApiError {
         pub code: String,

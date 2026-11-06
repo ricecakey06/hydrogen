@@ -14,6 +14,7 @@
     "allow-plugin-reload",
     "allow-panel-open",
     "allow-panel-call",
+    "allow-panel-theme",
     "allow-panel-close",
     "allow-ui-ready",
     "core:window:allow-minimize",

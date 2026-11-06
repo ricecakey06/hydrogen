@@ -2,6 +2,33 @@ use hydrogen::launcher::{java, storage::*};
 use std::fs;
 
 #[test]
+fn theme_choice_survives_native_storage_round_trips_and_invalid_ids_are_rejected() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut store = Store::open(directory.path().to_path_buf()).unwrap();
+    let mut settings = store.settings.clone();
+    settings.theme = hydrogen::plugins::themes::Choice {
+        id: "example.paper:paper".into(),
+        mode: "dark".into(),
+        material: "opaque".into(),
+    };
+    store.save(settings.clone()).unwrap();
+    for invalid in [
+        "example.paper:0paper",
+        "builtin:paper",
+        "example..paper:paper",
+        "example.paper:paper.",
+    ] {
+        let mut invalid_settings = settings.clone();
+        invalid_settings.theme.id = invalid.into();
+        assert!(store.save(invalid_settings).is_err(), "accepted {invalid}");
+    }
+    drop(store);
+    let reopened = Store::open(directory.path().to_path_buf()).unwrap();
+    assert_eq!(reopened.settings.theme, settings.theme);
+    assert_eq!(reopened.settings.locale, settings.locale);
+}
+
+#[test]
 fn microsoft_client_id_upgrades_previous_defaults_and_preserves_custom_clients() {
     let dir = tempfile::tempdir().unwrap();
     let mut store = Store::open(dir.path().to_path_buf()).unwrap();

@@ -16,7 +16,7 @@ fn fixture(source: &str, permissions: &[&str]) -> (tempfile::TempDir, Plugin) {
     fs::write(
         dir.path().join("plugin.json"),
         serde_json::to_vec(&serde_json::json!({
-            "schemaVersion":2,"apiVersion":1,"id":"example.test","name":"Test","version":"1.0.0",
+            "schemaVersion":3,"apiVersion":2,"id":"example.test","name":"Test","version":"1.0.0",
             "runtime":"javascript","entry":"main.js","permissions":permissions,
             "contributes":{"commands":[{"id":"test","title":"Test"}]}
         }))

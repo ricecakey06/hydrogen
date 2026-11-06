@@ -40,6 +40,7 @@ impl Window {
 struct State {
     glass: glass::State,
     owner: Option<isize>,
+    opaque: bool,
     previous: BTreeMap<isize, (u32, u32)>,
 }
 impl State {
@@ -63,10 +64,12 @@ impl State {
         };
         match method {
             "apply" => {
+                self.opaque = p["opaque"].as_bool().unwrap_or(false);
                 self.owner = Some(window.handle);
                 Ok(serde_json::to_value(window::apply(
                     &window,
                     &mut self.glass,
+                    self.opaque,
                 ))?)
             }
             "geometry" => Ok(serde_json::to_value(window::geometry(&window))?),
@@ -79,7 +82,7 @@ impl State {
                     return Ok(Value::Null);
                 }
                 if self.owner != Some(window.handle) {
-                    window::apply(&window, &mut self.glass);
+                    window::apply(&window, &mut self.glass, self.opaque);
                     self.owner = Some(window.handle);
                 }
                 let mut result = Value::Null;

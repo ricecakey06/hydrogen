@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "apiVersion": 1,
   "id": "account.offline",
   "name": "离线启动",
@@ -7,6 +7,30 @@
   "version": "1.0.0",
   "runtime": "native",
   "entry": "bin/plugin.dll",
-  "permissions": ["native.code"],
-  "provides": [{"id":"account.offline", "version":"1.0.0", "methods":["view","signIn","signOut","session"]}]
+  "permissions": [
+    "native.code"
+  ],
+  "provides": [
+    {
+      "id": "account.offline",
+      "version": "1.0.0",
+      "methods": [
+        "view",
+        "signIn",
+        "signOut",
+        "session"
+      ]
+    }
+  ],
+  "contributes": {
+    "providers": [
+      {
+        "id": "offline",
+        "kind": "accountProvider",
+        "title": "离线档案",
+        "service": "account.offline",
+        "version": "1.0.0"
+      }
+    ]
+  }
 }

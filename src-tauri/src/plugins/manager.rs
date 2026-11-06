@@ -469,6 +469,18 @@ pub fn reload_candidate(previous: &Plugin) -> Result<Plugin> {
         .permissions
         .iter()
         .any(|permission| !previous.manifest.permissions.contains(permission))
+        || checked
+            .manifest
+            .scopes
+            .http
+            .iter()
+            .any(|scope| !previous.manifest.scopes.http.contains(scope))
+        || checked
+            .manifest
+            .scopes
+            .process
+            .iter()
+            .any(|scope| !previous.manifest.scopes.process.contains(scope))
     {
         return Err(ApiError::new(
             "PLUGIN_PERMISSION_CHANGED",

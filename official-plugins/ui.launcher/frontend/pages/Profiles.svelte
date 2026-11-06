@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PluginSlot from '../../../ui.shell/frontend/components/PluginSlot.svelte';
   import { t } from '../../../ui.shell/frontend/lib/i18n';
   import { tick } from 'svelte';
   import { action, errorMessage, taskActive, type Profile, type Snapshot } from '../../../ui.shell/frontend/lib/api';
@@ -58,17 +59,25 @@
     await operate(selected ? 'signIn' : 'profileSelect', selected ? {} : { id: profile.id });
   }
 </script>
+{#each snapshot?.plugins.filter(p => p.enabled && !p.problem) ?? [] as plugin}
+  {#each (plugin.providers ?? []).filter(p => p.kind === 'accountProvider' && !['account.microsoft','account.offline'].includes(plugin.id)) as provider}
+    <button data-h-part="button" onclick={async () => { try { await action('profileAddProvider', { provider: plugin.id + ':' + provider.id, name: provider.title }); await onchange(); } catch (e) { error = errorMessage(e); } }}>{t("添加 {0}", provider.title)}</button>
+  {/each}
+{/each}
+
+<PluginSlot {snapshot} location="profiles.actions" context={{ instanceId: snapshot?.selectedInstanceId }} onchange={onchange} />
+
 
 <div class="profiles-page">
   <div class="profiles-toolbar">
     <div><h2>{t("游戏档案")}</h2><p class="caption">{t("选择启动游戏时使用的正版账号或离线玩家。")}</p></div>
-    <button class="primary profile-add" disabled={locked || adding} onclick={openAdd}><Icon name="plus" size={18} />{t("添加档案")}</button>
+    <button data-h-part="button" data-h-variant="primary" class="primary profile-add" disabled={locked || adding} onclick={openAdd}><Icon name="plus" size={18} />{t("添加档案")}</button>
   </div>
   {#if gameRunning}<p class="caption profile-feedback" role="status">{t("游戏运行或准备启动期间，暂时无法更改档案。")}</p>{/if}
   {#if snapshot?.readOnly}<p class="issue profile-feedback">{t("当前数据目录只读，暂时无法更改档案。")}</p>{/if}
   {#if account?.status === 'unavailable' && account.detail}<p class="issue profile-feedback" role="alert">{t(account.detail)}</p>{/if}
   {#if login && login.phase !== 'restoring'}
-    <div class="profile-login" role="status"><Icon name="spinner" size={20} /><div><strong>{t("正在登录微软账号")}</strong><p class="caption">{t("请在系统浏览器中完成授权。")}</p></div><button class="text-button" disabled={pending} onclick={() => operate('cancelTask', { id: login.id })}>{t("取消登录")}</button></div>
+    <div class="profile-login" role="status"><Icon name="spinner" size={20} /><div><strong>{t("正在登录微软账号")}</strong><p class="caption">{t("请在系统浏览器中完成授权。")}</p></div><button data-h-part="button" class="text-button" disabled={pending} onclick={() => operate('cancelTask', { id: login.id })}>{t("取消登录")}</button></div>
   {:else if lastLogin?.phase === 'failed'}<p class="issue profile-feedback" role="alert">{t(lastLogin.message)}</p>{/if}
   {#if error}<p class="issue profile-feedback" role="alert">{error}</p>{/if}
   {#if message}<p class="notice profile-feedback" role="status">{message}</p>{/if}
@@ -77,16 +86,16 @@
       <form class="profile-form" onsubmit={event => { event.preventDefault(); void add(); }} in:entrance>
         <h3>{t("添加新档案")}</h3>
         <div class="segmented" role="group" aria-label={t("档案类型")}>
-          <button type="button" class:selected={kind === 'microsoft'} aria-pressed={kind === 'microsoft'} disabled={locked || !microsoftAvailable} onclick={() => changeKind('microsoft')}>{t("正版账号")}</button>
-          <button type="button" class:selected={kind === 'offline'} aria-pressed={kind === 'offline'} disabled={locked || !account?.offlineAvailable} onclick={() => changeKind('offline')}>{t("离线玩家")}</button>
+          <button data-h-part="button" type="button" class:selected={kind === 'microsoft'} aria-pressed={kind === 'microsoft'} disabled={locked || !microsoftAvailable} onclick={() => changeKind('microsoft')}>{t("正版账号")}</button>
+          <button data-h-part="button" type="button" class:selected={kind === 'offline'} aria-pressed={kind === 'offline'} disabled={locked || !account?.offlineAvailable} onclick={() => changeKind('offline')}>{t("离线玩家")}</button>
         </div>
         {#if kind === 'offline'}
           <label class="section-label" for="profile-player-name">{t("游戏名")}</label>
-          <input id="profile-player-name" bind:this={nameInput} bind:value={name} placeholder={t("例如 Steve")} maxlength="16" autocomplete="off" spellcheck="false" disabled={locked} aria-describedby="profile-name-help" />
+          <input data-h-part="input-shell" id="profile-player-name" bind:this={nameInput} bind:value={name} placeholder={t("例如 Steve")} maxlength="16" autocomplete="off" spellcheck="false" disabled={locked} aria-describedby="profile-name-help" />
           <p class="caption" id="profile-name-help">{t("3–16 个英文字母、数字或下划线。不同游戏名会使用不同的离线玩家身份。")}</p>
         {:else}<p class="caption">{t("通过微软登录添加，验证成功后会出现在档案列表中。")}</p>{/if}
         {#if !account?.offlineAvailable}<p class="caption">{t("添加离线档案需要启用“离线启动”插件。")}</p>{/if}
-        <div class="profile-form-actions"><button type="button" disabled={pending} onclick={() => { adding = false; error = ''; }}>{t("取消")}</button><button class="primary" disabled={locked || (kind === 'microsoft' ? !microsoftAvailable : !account?.offlineAvailable)} type="submit">{kind === 'microsoft' ? t("登录微软账号") : t("添加档案")}</button></div>
+        <div data-h-part="card" class="profile-form-actions"><button data-h-part="button" type="button" disabled={pending} onclick={() => { adding = false; error = ''; }}>{t("取消")}</button><button data-h-part="button" data-h-variant="primary" class="primary" disabled={locked || (kind === 'microsoft' ? !microsoftAvailable : !account?.offlineAvailable)} type="submit">{kind === 'microsoft' ? t("登录微软账号") : t("添加档案")}</button></div>
       </form>
     {/if}
     {#if profiles.length}
@@ -94,13 +103,13 @@
         {#each profiles as profile (profile.id)}
           {@const selected = profile.id === account?.selectedProfileId}
           {@const available = profile.kind === 'offline' ? account?.offlineAvailable : microsoftAvailable}
-          <div class="profile-row" class:is-selected={selected} role="listitem">
-            <button class="profile-select" class:profile-unavailable={!available} aria-label={`${selected ? (account?.status === 'signedOut' || account?.status === 'cached') ? t("重新登录") : t("当前档案") : t("使用档案")}：${profile.name}`} aria-pressed={selected} disabled={locked || !available} onclick={() => select(profile)}>
+          <div data-h-part="card" class="profile-row" class:is-selected={selected} role="listitem">
+            <button data-h-part="button" class="profile-select" class:profile-unavailable={!available} aria-label={`${selected ? (account?.status === 'signedOut' || account?.status === 'cached') ? t("重新登录") : t("当前档案") : t("使用档案")}：${profile.name}`} aria-pressed={selected} disabled={locked || !available} onclick={() => select(profile)}>
               <span class="profile-avatar"><PlayerAvatar skin={profile.skin} size={48} iconSize={28} iconWidth={1.5} /></span>
               <span class="profile-info"><strong>{profile.name}</strong><span>{profile.kind === 'microsoft' ? t("正版账号") : t("离线玩家")}{!available ? t(" · 插件未启用") : selected && (account?.status === 'signedOut' || account?.status === 'cached') ? t(" · 需要登录") : ''}</span></span>
               <span class="profile-choice">{#if selected}<Icon name="check" size={18} /><span>{(account?.status === 'signedOut' || account?.status === 'cached') ? t("重新登录") : t("正在使用")}</span>{:else}{t("使用此档案")}{/if}</span>
             </button>
-            <button class="icon-button profile-delete" aria-label={t("删除档案：{0}", profile.name)} title={t("删除档案")} disabled={locked} onclick={() => ondelete(profile)}><Icon name="trash" size={19} width={1.7} /></button>
+            <button data-h-part="button" class="icon-button profile-delete" aria-label={t("删除档案：{0}", profile.name)} title={t("删除档案")} disabled={locked} onclick={() => ondelete(profile)}><Icon name="trash" size={19} width={1.7} /></button>
           </div>
         {/each}
       </div>

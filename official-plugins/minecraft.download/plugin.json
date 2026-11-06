@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "apiVersion": 1,
   "id": "minecraft.download",
   "name": "minecraft.download",
@@ -29,5 +29,23 @@
         "cancel"
       ]
     }
-  ]
+  ],
+  "contributes": {
+    "providers": [
+      {
+        "id": "official",
+        "kind": "downloadSource",
+        "title": "官方源（Mojang）",
+        "service": "minecraft.download",
+        "version": "1.0.0"
+      },
+      {
+        "id": "bmclapi",
+        "kind": "downloadSource",
+        "title": "BMCLAPI（bangbang93）",
+        "service": "minecraft.download",
+        "version": "1.0.0"
+      }
+    ]
+  }
 }

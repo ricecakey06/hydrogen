@@ -26,6 +26,11 @@ pub fn extract(client: &net::Client, game: &Prepared, directory: &Path) -> Resul
 }
 impl Launcher {
     pub fn launch(self: &Arc<Self>, id: String, window: tauri::WebviewWindow) -> Result<String> {
+        let patch = self.plugins.hooks(
+            &self.lease().settings,
+            "beforeLaunch",
+            json!({"instanceId":id}),
+        )?;
         let _identity = self.identity.lock().unwrap();
         if self
             .tasks
@@ -41,7 +46,15 @@ impl Launcher {
         self.require("minecraft.launch")?;
         let instance_lock = self.instance_lock(&id)?;
         let root = self.lease();
-        let instance = self.store.lock().unwrap().instance(&id)?;
+        let mut instance = self.store.lock().unwrap().instance(&id)?;
+        if let Some(memory) = patch["maxMemoryMib"].as_u64() {
+            instance.overrides.max_memory_mib = Some(memory as u32);
+        }
+        if let Some(arguments) = patch["jvmArguments"].as_str() {
+            instance.overrides.jvm_arguments = Some(arguments.into());
+        }
+        // Use the same memory and JVM validation as saved settings, without persisting Hook changes.
+        root.settings.effective(&self.client, &instance.overrides)?;
         let job = self.tasks.start("launch", Some(&id))?;
         let task_id = job.state.lock().unwrap().id.clone();
         let this = self.clone();

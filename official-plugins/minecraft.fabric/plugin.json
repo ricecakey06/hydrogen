@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "apiVersion": 1,
   "id": "minecraft.fabric",
   "name": "Fabric 快捷安装",
@@ -43,5 +43,23 @@
         "cancel"
       ]
     }
-  ]
+  ],
+  "contributes": {
+    "providers": [
+      {
+        "id": "fabric",
+        "kind": "loaderProvider",
+        "title": "Fabric",
+        "service": "minecraft.fabric",
+        "version": "1.0.0"
+      },
+      {
+        "id": "quilt",
+        "kind": "loaderProvider",
+        "title": "Quilt",
+        "service": "minecraft.fabric",
+        "version": "1.0.0"
+      }
+    ]
+  }
 }

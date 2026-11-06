@@ -67,13 +67,24 @@ async fn install(mut state: Value, mut instance: Value, job: Arc<Job>) -> Result
     let mut prepared=service_task("minecraft.preinstall","prepare",json!({"gameRoot":game_root,"settings":settings,"metadata":metadata,"architecture":if cfg!(target_arch="aarch64"){"arm64"}else{"x64"}}),&job).await?;
     if !existing && instance["components"].is_object() {
         let kind = instance["components"]["kind"].as_str().unwrap_or("fabric");
-        let service = if matches!(kind, "forge" | "neoforge") {
-            "minecraft.forge"
+        if kind.contains(':') {
+            let patch = invoke(
+                "host.providers",
+                "loaderProvider",
+                "installPlan",
+                json!({"id":kind,"params":{"gameVersion":version,"loaderVersion":instance["components"]["loader"]}}),
+            )?;
+            apply_loader_patch(&mut metadata, &patch)?;
+            prepared=service_task("minecraft.preinstall","prepare",json!({"gameRoot":game_root,"settings":settings,"metadata":metadata,"architecture":if cfg!(target_arch="aarch64"){"arm64"}else{"x64"}}),&job).await?;
         } else {
-            "minecraft.fabric"
-        };
-        job.phase("preparing", "正在准备模组加载器…");
-        prepared=service_task(service,"prepare",json!({"root":root,"gameRoot":game_root,"game":game,"settings":settings,"version":version,"components":instance["components"],"prepared":prepared,"installing":true}),&job).await?;
+            let service = if matches!(kind, "forge" | "neoforge") {
+                "minecraft.forge"
+            } else {
+                "minecraft.fabric"
+            };
+            job.phase("preparing", "正在准备模组加载器…");
+            prepared=service_task(service,"prepare",json!({"root":root,"gameRoot":game_root,"game":game,"settings":settings,"version":version,"components":instance["components"],"prepared":prepared,"installing":true}),&job).await?;
+        }
     }
     job.check()?;
     job.phase("committing", "正在提交安装状态…");
@@ -114,6 +125,93 @@ async fn install(mut state: Value, mut instance: Value, job: Arc<Job>) -> Result
     }
     Ok(state)
 }
+fn apply_loader_patch(metadata: &mut Value, patch: &Value) -> Result<()> {
+    let object = patch
+        .as_object()
+        .ok_or_else(|| ApiError::new("INVALID_LOADER_PLAN", "加载器计划必须为对象。"))?;
+    if object
+        .keys()
+        .any(|key| !["mainClass", "libraries", "arguments"].contains(&key.as_str()))
+    {
+        return Err(ApiError::new(
+            "INVALID_LOADER_PLAN",
+            "加载器计划修改了未开放的字段。",
+        ));
+    }
+    if let Some(main) = object.get("mainClass") {
+        if !main.as_str().is_some_and(|s| {
+            !s.is_empty()
+                && s.len() <= 200
+                && s.bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"._$".contains(&b))
+        }) {
+            return Err(ApiError::new("INVALID_LOADER_PLAN", "启动类无效。"));
+        }
+        metadata["mainClass"] = main.clone();
+    }
+    if let Some(libraries) = object.get("libraries") {
+        let libraries = libraries
+            .as_array()
+            .filter(|v| v.len() <= 256)
+            .ok_or_else(|| ApiError::new("INVALID_LOADER_PLAN", "加载器库列表无效。"))?;
+        for library in libraries {
+            let artifact = &library["downloads"]["artifact"];
+            if !library["name"].is_string()
+                || !artifact["sha1"]
+                    .as_str()
+                    .is_some_and(hydrogen_plugin_services::storage::valid_hash)
+                || !artifact["size"]
+                    .as_u64()
+                    .is_some_and(|n| n > 0 && n <= 1024 * 1024 * 1024)
+                || !artifact["url"].is_string()
+            {
+                return Err(ApiError::new(
+                    "INVALID_LOADER_PLAN",
+                    "加载器库必须提供坐标、下载地址、大小和 SHA-1。",
+                ));
+            }
+        }
+        if metadata["libraries"].is_null() {
+            metadata["libraries"] = json!([]);
+        }
+        metadata["libraries"]
+            .as_array_mut()
+            .ok_or_else(|| ApiError::new("INVALID_METADATA", "原版库列表无效。"))?
+            .extend(libraries.iter().cloned());
+    }
+    if let Some(arguments) = object.get("arguments") {
+        let arguments = arguments
+            .as_object()
+            .filter(|v| v.keys().all(|k| ["jvm", "game"].contains(&k.as_str())))
+            .ok_or_else(|| ApiError::new("INVALID_LOADER_PLAN", "启动参数无效。"))?;
+        for (key, values) in arguments {
+            let values = values
+                .as_array()
+                .filter(|v| {
+                    v.len() <= 128
+                        && v.iter().all(|v| {
+                            v.as_str()
+                                .is_some_and(|s| s.len() <= 4096 && !s.contains('\0'))
+                        })
+                })
+                .ok_or_else(|| {
+                    ApiError::new("INVALID_LOADER_PLAN", "启动参数必须为有界字符串数组。")
+                })?;
+            if metadata["arguments"].is_null() {
+                metadata["arguments"] = json!({});
+            }
+            if metadata["arguments"][key].is_null() {
+                metadata["arguments"][key] = json!([]);
+            }
+            metadata["arguments"][key]
+                .as_array_mut()
+                .ok_or_else(|| ApiError::new("INVALID_METADATA", "原版启动参数无效。"))?
+                .extend(values.iter().cloned());
+        }
+    }
+    Ok(())
+}
+
 impl State {
     fn call(&mut self, r: &mut Value) -> Result<Value> {
         let p = &r["params"];

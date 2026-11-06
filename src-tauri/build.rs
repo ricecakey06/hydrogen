@@ -9,6 +9,7 @@ fn main() {
             "plugin_reload",
             "panel_open",
             "panel_call",
+            "panel_theme",
             "panel_close",
             "ui_ready",
             "ui_bootstrap",

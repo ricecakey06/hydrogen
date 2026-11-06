@@ -5,7 +5,7 @@ use hydrogen_plugin_services::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
 };
 
@@ -25,6 +25,8 @@ pub struct Profiles {
     pub profiles: Vec<Profile>,
     pub microsoft: Option<String>,
     pub offline: Option<String>,
+    #[serde(default)]
+    pub providers: BTreeMap<String, String>,
 }
 
 pub fn valid_name(name: &str) -> bool {
@@ -53,7 +55,8 @@ impl Profiles {
                 || profiles.profiles.len() > 256
                 || profiles.profiles.iter().any(|p| {
                     !ids.insert(&p.id)
-                        || !["microsoft", "offline"].contains(&p.kind.as_str())
+                        || (!["microsoft", "offline"].contains(&p.kind.as_str())
+                            && !p.kind.contains(':'))
                         || (p.kind == "offline" && !valid_name(&p.name))
                         || (p.id != "legacy-offline" && account_root(root, &p.id).is_err())
                 })
@@ -83,6 +86,7 @@ impl Profiles {
             profiles: vec![],
             microsoft: None,
             offline: None,
+            providers: BTreeMap::new(),
         };
         if storage::within(root, "credentials.bin")?.is_file() {
             value.profiles.push(Profile {
@@ -113,6 +117,32 @@ impl Profiles {
             .find(|p| p.id == id)
             .ok_or_else(|| ApiError::new("PROFILE_NOT_FOUND", "此档案已不存在，请刷新后重试。"))
     }
+    pub fn selected_mode(&self, settings: &Settings) -> Option<&Profile> {
+        if settings.account_mode.contains(':') {
+            self.providers.get(&settings.account_mode).and_then(|id| {
+                self.profiles
+                    .iter()
+                    .find(|p| &p.id == id && p.kind == settings.account_mode)
+            })
+        } else {
+            self.selected(settings.offline_selected())
+        }
+    }
+    pub fn add_provider(&mut self, kind: &str, name: &str) -> Result<Profile> {
+        self.check_limit()?;
+        if !kind.contains(':') || kind.len() > 201 || name.is_empty() || name.len() > 200 {
+            return Err(ApiError::new("INVALID_PROFILE", "提供者或档案名称无效。"));
+        }
+        let profile = Profile {
+            id: uuid::Uuid::new_v4().to_string(),
+            kind: kind.into(),
+            name: name.into(),
+            uuid: None,
+        };
+        self.profiles.push(profile.clone());
+        self.providers.insert(kind.into(), profile.id.clone());
+        Ok(profile)
+    }
     pub fn selected(&self, offline: bool) -> Option<&Profile> {
         let id = if offline {
             &self.offline
@@ -124,7 +154,9 @@ impl Profiles {
     }
     pub fn select(&mut self, id: &str) -> Result<Profile> {
         let profile = self.get(id)?.clone();
-        if profile.kind == "offline" {
+        if profile.kind.contains(':') {
+            self.providers.insert(profile.kind.clone(), id.into());
+        } else if profile.kind == "offline" {
             self.offline = Some(id.into());
         } else {
             self.microsoft = Some(id.into());
@@ -165,6 +197,7 @@ impl Profiles {
     pub fn remove(&mut self, id: &str) -> Result<Profile> {
         let profile = self.get(id)?.clone();
         self.profiles.retain(|p| p.id != id);
+        self.providers.retain(|_, selected| selected != id);
         for (selected, kind) in [
             (&mut self.microsoft, "microsoft"),
             (&mut self.offline, "offline"),

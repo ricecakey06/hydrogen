@@ -1,16 +1,68 @@
 {
-  "schemaVersion": 2,
-  "apiVersion": 1,
+  "schemaVersion": 3,
+  "apiVersion": 2,
   "id": "example.instance-tools",
   "name": "实例工具",
   "version": "1.0.0",
   "runtime": "javascript",
   "entry": "main.js",
-  "activation": ["command:show-count"],
+  "activation": [
+    "command:show-count"
+  ],
   "dependencies": [],
-  "permissions": ["instances.read", "ui.contribute", "ui.panel"],
+  "permissions": [
+    "instances.read",
+    "ui.contribute",
+    "ui.panel",
+    "instances.repair",
+    "tasks.read",
+    "tasks.cancel"
+  ],
   "contributes": {
-    "commands": [{ "id": "show-count", "title": "查看实例数量" }],
-    "panels": [{ "id": "overview", "title": "实例概览", "entry": "ui/index.html" }]
+    "commands": [
+      {
+        "id": "show-count",
+        "title": "查看实例数量"
+      },
+      {
+        "id": "repair",
+        "title": "修复此实例"
+      }
+    ],
+    "panels": [
+      {
+        "id": "overview",
+        "title": "实例概览",
+        "entry": "ui/index.html"
+      }
+    ],
+    "views": [
+      {
+        "id": "tools-page",
+        "title": "实例工具",
+        "location": "sidebar.main",
+        "panel": "overview"
+      },
+      {
+        "id": "tools-settings",
+        "title": "实例工具",
+        "location": "settings.sections",
+        "panel": "overview"
+      },
+      {
+        "id": "tools-tab",
+        "title": "实例工具",
+        "location": "instance.tabs",
+        "panel": "overview"
+      }
+    ],
+    "menus": [
+      {
+        "id": "repair-instance",
+        "location": "instance.toolbar",
+        "command": "repair",
+        "when": "instanceSelected"
+      }
+    ]
   }
 }

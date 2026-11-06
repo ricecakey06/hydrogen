@@ -127,6 +127,7 @@ fn legacy_settings(
     }
     let old = &value["settings"];
     let mut settings = Settings {
+        theme: Default::default(),
         java: old["java"]["executablePath"].as_str().map(String::from),
         max_memory_mib: old["maxMemoryMiB"]
             .as_u64()

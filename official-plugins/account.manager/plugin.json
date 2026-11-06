@@ -39,7 +39,8 @@
         "profiles.hasCredentials",
         "profiles.addOffline",
         "profiles.select",
-        "profiles.delete"
+        "profiles.delete",
+        "profiles.addProvider"
       ]
     }
   ]

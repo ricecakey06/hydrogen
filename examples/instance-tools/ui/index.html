@@ -1,6 +1,3 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><link rel="stylesheet" href="style.css"><title>实例概览</title></head>
-<body><h2>实例概览</h2><p>这个面板通过隔离通道调用本插件的 QuickJS 命令。</p>
-<button id="count">读取实例数量</button><p id="result" role="status">等待宿主握手…</p>
-<details><summary>隔离检查</summary><pre id="probe"></pre></details>
-<script src="main.js"></script></body></html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><title>实例工具</title></head>
+<body><main><h1>实例工具</h1><p id="instance">正在连接启动器…</p><div class="actions"><button id="count">查看实例数量</button><button id="repair" disabled>修复此实例</button><button id="cancel" disabled>取消任务</button></div><progress id="progress" max="100" value="0"></progress><p id="status" role="status"></p></main><script type="module" src="main.js"></script></body></html>

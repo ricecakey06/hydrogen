@@ -10,7 +10,7 @@ use std::{fs, io::Write, path::Path};
 
 fn plugin(root: &Path, id: &str, version: &str, dependencies: serde_json::Value) {
     fs::create_dir_all(root).unwrap();
-    fs::write(root.join("plugin.json"),serde_json::to_vec(&json!({"schemaVersion":2,"apiVersion":1,"id":id,"name":id,"version":version,"runtime":"javascript","entry":"main.js","dependencies":dependencies,"permissions":[]})).unwrap()).unwrap();
+    fs::write(root.join("plugin.json"),serde_json::to_vec(&json!({"schemaVersion":3,"apiVersion":2,"id":id,"name":id,"version":version,"runtime":"javascript","entry":"main.js","dependencies":dependencies,"permissions":[]})).unwrap()).unwrap();
     fs::write(root.join("main.js"), "export function activate(ctx) {}\n").unwrap();
 }
 

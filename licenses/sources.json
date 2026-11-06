@@ -189,6 +189,15 @@
     ],
     "npm:locate-character@3.0.0": [
       "https://raw.githubusercontent.com/spdx/license-list-data/v3.26.0/text/MIT.txt"
+    ],
+    "Cargo:lightningcss-derive@1.0.0-alpha.43": [
+      "https://raw.githubusercontent.com/parcel-bundler/lightningcss/c7fc5a10120b1a98c603855dd319a6747e6b9409/LICENSE"
+    ],
+    "Cargo:static-self@0.1.2": [
+      "https://raw.githubusercontent.com/parcel-bundler/lightningcss/222fa9f7ad8b4004afd7a30c2f99cab3c8621191/LICENSE"
+    ],
+    "Cargo:static-self-derive@0.1.1": [
+      "https://raw.githubusercontent.com/parcel-bundler/lightningcss/0cc21e83b7fdf30045df1f8c7693d5e704e5c2c5/LICENSE"
     ]
   }
 }

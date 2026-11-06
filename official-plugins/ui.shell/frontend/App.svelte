@@ -6,6 +6,14 @@
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import { invoke, action, errorMessage, taskActive, type Snapshot, type Profile, type InstanceInfo } from './lib/api';
   import { animateText, entrance, fadeSlide } from './lib/motion';
+  import PluginSlot from './components/PluginSlot.svelte';
+  import ThemeRecovery from './components/ThemeRecovery.svelte';
+  import AppearanceSettings from './components/AppearanceSettings.svelte';
+  import { attachTheme, syncThemeSettings, cancelTheme, refreshThemeRoot } from './lib/theme';
+  let themeRoot = $state<HTMLDivElement>();
+  $effect(() => { refreshThemeRoot(themeRoot); });
+  import PluginPanel from './components/PluginPanel.svelte';
+  import { uiState, type Contribution } from './lib/contributions';
   import Icon from './components/Icon.svelte';
   import Versions from '../../ui.launcher/frontend/pages/Versions.svelte';
   import SettingsForm, { type InstanceSettingsTab } from '../../ui.launcher/frontend/pages/SettingsForm.svelte';
@@ -20,12 +28,20 @@
   import Modpacks from '../../ui.launcher/frontend/pages/Modpacks.svelte';
   import Profiles from '../../ui.launcher/frontend/pages/Profiles.svelte';
 
-  type Page = 'profiles' | 'home' | 'versions' | 'instance' | 'settings' | 'downloads' | 'crash' | 'resources';
+  type Page = 'profiles' | 'home' | 'versions' | 'instance' | 'settings' | 'downloads' | 'crash' | 'resources' | 'plugin';
   type ResizeDirection = Parameters<ReturnType<typeof getCurrentWindow>['startResizeDragging']>[0];
   let page = $state<Page>('home');
+  let externalView = $state<Contribution | null>(null);
+  function openContribution(item: Contribution) { externalView = item; navigate('plugin'); }
   let sidebarCollapsed = $state(false);
   let navigationDirection = $state(1);
-  let settingsTab = $state<'general' | 'plugins' | 'about'>('general');
+  type SettingsTab = 'general' | 'theme' | 'plugins' | 'about';
+  let settingsTab = $state<SettingsTab>('general');
+  function selectSettingsTab(next: SettingsTab, pluginId = '') {
+    if (settingsTab === 'theme' && next !== 'theme') void cancelTheme();
+    settingsTab = next;
+    selectedPluginId = pluginId;
+  }
   let versionMode = $state<'instances' | 'catalog' | 'configure'>('instances');
   let selectedPluginId = $state('');
   let snapshot = $state<Snapshot | null>(null);
@@ -50,7 +66,7 @@
   let resizeQueued = false;
   const selected = $derived(snapshot?.instances.find(i => i.id === snapshot?.selectedInstanceId));
   const editing = $derived(snapshot?.instances.find(i => i.id === editingInstanceId) ?? selected);
-  function pageTitle(active: Page) { return { home: '', versions: t("版本选择"), instance: t("版本设置"), profiles: t("档案管理"), settings: t("启动器设置"), downloads: t("下载管理"), crash: t("崩溃分析"), resources: t("资源下载") }[active]; }
+  function pageTitle(active: Page) { return { plugin: externalView?.title ?? t("插件"), home: '', versions: t("版本选择"), instance: t("版本设置"), profiles: t("档案管理"), settings: t("启动器设置"), downloads: t("下载管理"), crash: t("崩溃分析"), resources: t("资源下载") }[active]; }
   function showCrash(id: string) { crashTaskId = id; navigate('crash'); }
   $effect(() => {
     if (modal) return;
@@ -61,10 +77,10 @@
     { direction: 'North', edge: 'top' }, { direction: 'South', edge: 'bottom' }, { direction: 'West', edge: 'left' }, { direction: 'East', edge: 'right' },
     { direction: 'NorthWest', edge: 'top-left' }, { direction: 'NorthEast', edge: 'top-right' }, { direction: 'SouthWest', edge: 'bottom-left' }, { direction: 'SouthEast', edge: 'bottom-right' },
   ];
-  function fit() { scale = Math.min(window.innerWidth / 1000, window.innerHeight / 714); }
+  function fit() { scale = 1; }
   let requestSequence = 0, appliedSequence = 0;
   function stable<T>(value: T, previous: T | undefined): T { return previous !== undefined && JSON.stringify(value) === JSON.stringify(previous) ? previous : value; }
-  async function load() { const sequence = ++requestSequence; const next = await invoke<Snapshot>('app_snapshot'); if (sequence < appliedSequence) return; appliedSequence = sequence; next.plugins = stable(next.plugins, snapshot?.plugins); next.instances = stable(next.instances, snapshot?.instances); next.settings = stable(next.settings, snapshot?.settings); next.javaRuntimes = stable(next.javaRuntimes, snapshot?.javaRuntimes); next.account = stable(next.account, snapshot?.account); snapshot = next; document.documentElement.dataset.material = next.appearance.material; await loadLanguage(next.dataDirectory, next.settings.locale, next.plugins.find(p => p.id === 'i18n')); }
+  async function load() { const sequence = ++requestSequence; const next = await invoke<Snapshot>('app_snapshot'); if (sequence < appliedSequence) return; appliedSequence = sequence; next.plugins = stable(next.plugins, snapshot?.plugins); next.instances = stable(next.instances, snapshot?.instances); next.settings = stable(next.settings, snapshot?.settings); next.javaRuntimes = stable(next.javaRuntimes, snapshot?.javaRuntimes); next.account = stable(next.account, snapshot?.account); snapshot = next; syncThemeSettings(next.settings, next.dataDirectory, next.plugins); document.documentElement.dataset.material = next.appearance.material; await loadLanguage(next.dataDirectory, next.settings.locale, next.plugins.find(p => p.id === 'i18n')); }
   async function operate(type: string, fields: Record<string, unknown> = {}) { try { await action(type, fields); await load(); } catch (e) { error = errorMessage(e); } }
   let downloadError = $state('');
   function showDownloads() { downloadError = ''; navigate('downloads'); }
@@ -73,7 +89,7 @@
     catch (e) { error = errorMessage(e); }
   }
   async function startInstall(id: string) { downloadError = ''; navigate('downloads'); try { await action('repair', { id }); await load(); } catch (e) { downloadError = errorMessage(e); } }
-  function navigate(next: Page) { navigationDirection = next === 'home' ? -1 : 1; page = next; error = ''; selectedPluginId = ''; resourceTrail = []; void load().catch(e => error = errorMessage(e)); }
+  function navigate(next: Page) { if (page === 'settings' && next !== 'settings') void cancelTheme(); navigationDirection = next === 'home' ? -1 : 1; page = next; error = ''; selectedPluginId = ''; resourceTrail = []; void load().catch(e => error = errorMessage(e)); }
   function toggleResources() {
     if (page === 'resources') { resourceExpanded = !resourceExpanded; return; }
     resourceExpanded = true;
@@ -191,8 +207,23 @@
   });
   onMount(() => {
     fit();
+    const detachTheme = attachTheme(themeRoot!, snapshot?.settings.theme ?? { id: 'builtin:default', mode: 'system', material: 'auto' });
     let stopped = false;
     const unlisteners: UnlistenFn[] = [];
+    void listen<{ pluginId: string; digest: string; generation: number; id: string; state: { title?: string; badge?: string; enabled?: boolean; visible?: boolean } }>('plugin-ui-update', event => {
+      const v = event.payload;
+      const key=v.pluginId + '/' + v.digest + '/' + v.id;
+      uiState.update(state => (state[key]?.generation ?? 0) > v.generation ? state : { ...state, [key]: { ...v.state, generation: v.generation } });
+    }).then(value => { if (stopped) value(); else unlisteners.push(value); });
+    void listen<{ pluginId: string; digest: string; generation: number }>('plugin-ui-stop', event => {
+      const v=event.payload, prefix=v.pluginId + '/' + v.digest + '/';
+      uiState.update(state => Object.fromEntries(Object.entries(state).filter(([key,value]) => !key.startsWith(prefix) || (value.generation ?? 0)>v.generation)));
+    }).then(value => { if (stopped) value(); else unlisteners.push(value); });
+    void listen<{ pluginId: string; id: string }>('plugin-navigate', event => {
+      const p = snapshot?.plugins.find(p => p.id === event.payload.pluginId && p.enabled && !p.problem);
+      const view = p?.views.find(v => v.id === event.payload.id);
+      if (p && view) openContribution({ ...view, pluginId: p.id, digest: p.digest, key: p.id + '/' + p.digest + '/' + view.id, enabled: true });
+    }).then(value => { if (stopped) value(); else unlisteners.push(value); });
     void listen<{ token: string; count: number }>('mod-files-dropped', event => {
       if (page === 'instance' && instanceTab === 'mods' && editing) {
         const id = editing.id;
@@ -203,7 +234,7 @@
       if (event.payload) error = errorMessage(event.payload);
       else showDownloads();
     }).then(value => { if (stopped) value(); else unlisteners.push(value); }).catch(e => error = errorMessage(e));
-    return () => { stopped = true; unlisteners.forEach(unlisten => unlisten()); };
+    return () => { stopped = true; detachTheme(); unlisteners.forEach(unlisten => unlisten()); };
   });
 
 </script>
@@ -211,61 +242,77 @@
 <svelte:window onresize={fit} onkeydown={keydown} onpointermove={resizeMove} onpointerup={resizeEnd} onpointercancel={resizeEnd} />
 {#key $i18n}
 <div class="viewport">
-  <div class="design-surface" class:sidebar-collapsed={sidebarCollapsed} style={`--ui-scale:${scale}`}>
-    <header class="titlebar" data-tauri-drag-region inert={!!modal}>
-      <span class="sidebar-mark"><button class="icon-button sidebar-toggle" aria-label={sidebarCollapsed ? t("展开侧栏") : t("收起侧栏")} title={sidebarCollapsed ? t("展开侧栏") : t("收起侧栏")} aria-expanded={!sidebarCollapsed} aria-controls="main-navigation" onclick={() => sidebarCollapsed = !sidebarCollapsed}><Icon name="panel" size={22} width={1.6} /></button></span><span class="brand" data-tauri-drag-region>Hydrogen</span>
-      <button class="icon-button caption-button" aria-label={t("最小化")} onclick={() => caption('minimize')}><Icon name="minus" size={24} width={2.5} /></button>
-      <button class="icon-button caption-button close-button" aria-label={t("关闭")} onclick={() => caption('close')}><Icon name="close" size={21} width={2.5} /></button>
+  <div bind:this={themeRoot} data-h-theme-root data-h-page={page} data-h-sidebar={sidebarCollapsed ? "collapsed" : "expanded"} class="design-surface" class:sidebar-collapsed={sidebarCollapsed} style={`--ui-scale:${scale}`}>
+    <div data-h-theme-slot="window.background" aria-hidden="true"></div>
+    <header data-h-part="titlebar" class="titlebar" data-tauri-drag-region inert={!!modal}>
+      <span class="sidebar-mark"><button data-h-part="button" class="icon-button sidebar-toggle" aria-label={sidebarCollapsed ? t("展开侧栏") : t("收起侧栏")} title={sidebarCollapsed ? t("展开侧栏") : t("收起侧栏")} aria-expanded={!sidebarCollapsed} aria-controls="main-navigation" onclick={() => sidebarCollapsed = !sidebarCollapsed}><Icon name="panel" size={22} width={1.6} /></button></span><span class="brand-space" data-tauri-drag-region><span class="brand" data-h-part="brand" aria-label="Hydrogen" data-tauri-drag-region><span data-h-builtin-brand>Hydrogen</span><img data-h-part="brand-image" hidden alt="" /></span></span>
+      <div data-h-theme-slot="titlebar.decoration" aria-hidden="true"></div>
+      <PluginSlot {snapshot} location="titlebar.actions" context={{ instanceId: selected?.id }} onchange={load} />
+      <button data-h-part="button" class="icon-button caption-button" aria-label={t("最小化")} onclick={() => caption('minimize')}><Icon name="minus" size={24} width={2.5} /></button>
+      <button data-h-part="button" class="icon-button caption-button close-button" aria-label={t("关闭")} onclick={() => caption('close')}><Icon name="close" size={21} width={2.5} /></button>
     </header>
     <main class="window-body" inert={!!modal}>
-      <nav id="main-navigation" class="sidebar" aria-label={t("主导航")}>
-        <button class:active={page === 'home'} aria-label={t("启动游戏")} title={sidebarCollapsed ? t("启动游戏") : undefined} onclick={() => navigate('home')}><Icon name="circle-play" /><span class="nav-label">{t("启动游戏")}</span></button>
-        <button class:active={page === 'versions' || page === 'instance'} aria-label={t("版本选择")} title={sidebarCollapsed ? t("版本选择") : undefined} onclick={() => { versionMode = 'instances'; navigate('versions'); }}><Icon name="cube" /><span class="nav-label">{t("版本选择")}</span></button>
+      <nav data-h-part="sidebar" id="main-navigation" class="sidebar" aria-label={t("主导航")}>
+        <div data-h-theme-slot="sidebar.background" aria-hidden="true"></div><div data-h-theme-slot="sidebar.decoration" aria-hidden="true"></div>
+        <button data-h-part="nav-item" class:active={page === 'home'} aria-label={t("启动游戏")} title={sidebarCollapsed ? t("启动游戏") : undefined} onclick={() => navigate('home')}><Icon name="circle-play" /><span class="nav-label">{t("启动游戏")}</span></button>
+        <button data-h-part="nav-item" class:active={page === 'versions' || page === 'instance'} aria-label={t("版本选择")} title={sidebarCollapsed ? t("版本选择") : undefined} onclick={() => { versionMode = 'instances'; navigate('versions'); }}><Icon name="cube" /><span class="nav-label">{t("版本选择")}</span></button>
         {#if resourcesAvailable}
           <div class="resource-menu">
-            <button class="resource-trigger" class:active={page === 'resources' && !showResourceMenu} aria-label={t("资源下载")} title={sidebarCollapsed ? t("资源下载") : undefined} aria-expanded={showResourceMenu} aria-controls={showResourceMenu ? 'resource-navigation' : undefined} onclick={toggleResources}>
+            <button data-h-part="nav-item" class="resource-trigger" class:active={page === 'resources' && !showResourceMenu} aria-label={t("资源下载")} title={sidebarCollapsed ? t("资源下载") : undefined} aria-expanded={showResourceMenu} aria-controls={showResourceMenu ? 'resource-navigation' : undefined} onclick={toggleResources}>
               <Icon name="download" /><span class="nav-label">{t("资源下载")}</span>
               <span class="nav-chevron" class:expanded={showResourceMenu}><Icon name="chevron" size={16} /></span>
             </button>
             {#if showResourceMenu}
               <div id="resource-navigation" class="resource-subnav" role="group" aria-label={t("资源分类")} in:entrance>
-                <button class="active" aria-current="page" aria-label={t("模组下载")} title={sidebarCollapsed ? t("模组下载") : undefined} onclick={() => resourceTrail = []}>
+                <button data-h-part="nav-item" class="active" aria-current="page" aria-label={t("模组下载")} title={sidebarCollapsed ? t("模组下载") : undefined} onclick={() => resourceTrail = []}>
                   <Icon name="puzzle" size={18} /><span class="nav-label">{t("模组下载")}</span>
                 </button>
               </div>
             {/if}
           </div>
         {/if}
-        <button class:active={page === 'profiles'} aria-label={t("档案管理")} title={sidebarCollapsed ? t("档案管理") : undefined} onclick={() => navigate('profiles')}><Icon name="profiles" /><span class="nav-label">{t("档案管理")}</span></button>
+        <button data-h-part="nav-item" class:active={page === 'profiles'} aria-label={t("档案管理")} title={sidebarCollapsed ? t("档案管理") : undefined} onclick={() => navigate('profiles')}><Icon name="profiles" /><span class="nav-label">{t("档案管理")}</span></button>
+        <PluginSlot {snapshot} location="sidebar.main" context={{ instanceId: selected?.id }} activeKey={page === 'plugin' ? externalView?.key : ''} onnavigate={openContribution} onchange={load} />
         <p class="nav-section">{t("扩展")}</p>
-        <button class:active={page === 'settings' && settingsTab === 'plugins'} aria-label={t("插件")} title={sidebarCollapsed ? t("插件") : undefined} onclick={() => { settingsTab = 'plugins'; navigate('settings'); }}><Icon name="puzzle" /><span class="nav-label">{t("插件")}</span></button>
-        <div class="sidebar-footer"><button class:active={page === 'settings' && settingsTab !== 'plugins'} aria-label={t("启动器设置")} title={sidebarCollapsed ? t("启动器设置") : undefined} onclick={() => { settingsTab = 'general'; navigate('settings'); }}><Icon name="gear" /><span class="nav-label">{t("启动器设置")}</span></button></div>
+        <button data-h-part="nav-item" class:active={page === 'settings' && settingsTab === 'plugins'} aria-label={t("插件")} title={sidebarCollapsed ? t("插件") : undefined} onclick={() => { selectSettingsTab('plugins'); navigate('settings'); }}><Icon name="puzzle" /><span class="nav-label">{t("插件")}</span></button>
+        <div class="sidebar-footer"><PluginSlot {snapshot} location="sidebar.footer" context={{ instanceId: selected?.id }} activeKey={page === 'plugin' ? externalView?.key : ''} onnavigate={openContribution} onchange={load} /><button data-h-part="nav-item" class:active={page === 'settings' && settingsTab !== 'plugins'} aria-label={t("启动器设置")} title={sidebarCollapsed ? t("启动器设置") : undefined} onclick={() => { selectSettingsTab('general'); navigate('settings'); }}><Icon name="gear" /><span class="nav-label">{t("启动器设置")}</span></button></div>
       </nav>
+      <div class="theme-content" data-h-part="content"><div data-h-theme-slot="content.background" aria-hidden="true"></div><div data-h-theme-slot="content.decoration" aria-hidden="true"></div>
       {#each [page] as activePage (activePage)}
-      <div class="route-layer" aria-hidden={page !== activePage} inert={page !== activePage} in:fadeSlide|global={{ direction: navigationDirection }} out:fadeSlide={{ direction: navigationDirection }}>
-      {#if activePage === 'home'}
+      <div data-h-part="page" class="route-layer" aria-hidden={page !== activePage} inert={page !== activePage} in:fadeSlide|global={{ direction: navigationDirection }} out:fadeSlide={{ direction: navigationDirection }}>
+      {#if activePage === 'plugin'}
+        {#if externalView && snapshot?.plugins.some(p => p.id === externalView?.pluginId && p.digest === externalView?.digest && p.enabled && !p.problem)}
+          <div class="page-shell plugin-page"><h1>{externalView.title}</h1>{#key externalView.key}<PluginPanel pluginId={externalView.pluginId} panelId={externalView.panel!} context={{ instanceId: selected?.id }} locale={snapshot?.settings.locale} height={520} onerror={message => error = message} />{/key}</div>
+        {:else}<p class="empty-state">{t("插件不可用，请重新打开。")}</p>{/if}
+      {:else if activePage === 'home'}
         <Home {snapshot} onlogin={login} oncancel={id => { void operate('cancelTask', { id }); }} onlaunch={() => selected && void operate('launch', { id: selected.id })} onversions={() => { versionMode = 'instances'; navigate('versions'); }} oninstance={() => selected && showSettings(selected.id)} onsettings={() => navigate('profiles')} ondownloads={() => navigate('downloads')} onlogs={id => { void operate('openLogs', { id }); }} oncrash={showCrash} />
       {:else}
-        <div class="page-shell"><div class="page-heading"><button class="icon-button back-button" aria-label={t("返回")} onclick={back}><Icon name="back" size={22} width={2.5} /></button><h1 use:animateText={pageTitle(activePage)}>{pageTitle(activePage)}</h1></div>
+        <div class="page-shell"><div data-h-part="page-heading" class="page-heading"><button data-h-part="button" class="icon-button back-button" aria-label={t("返回")} onclick={back}><Icon name="back" size={22} width={2.5} /></button><h1 use:animateText={pageTitle(activePage)}>{pageTitle(activePage)}</h1></div>
           {#if activePage === 'crash'}{#key crashTaskId}<CrashReport task={crashTask} onhome={() => navigate('home')} />{/key}
           {:else if activePage === 'profiles'}<Profiles {snapshot} onchange={load} ondelete={deleteProfile} />
           {:else if activePage === 'versions'}<Versions {snapshot} bind:mode={versionMode} onselect={select} onsettings={showSettings} onlaunch={launchInstance} onimportpack={modpacksAvailable ? importModpack : undefined} ondownloads={showDownloads} onchange={load} />
           {:else if activePage === 'instance'}
+            <PluginSlot {snapshot} location="instance.toolbar" context={{ instanceId: editing?.id }} onchange={load} />
             {#snippet packPanel(instance: InstanceInfo)}<Modpacks {instance} {snapshot} onchange={load} />{/snippet}
             <SettingsForm onprofiles={() => navigate('profiles')} instance={editing} {snapshot} bind:instanceTab exportPack={modpacksAvailable ? packPanel : undefined} onlogin={login} onchange={load} ondelete={deleteInstance} onimport={importLegacy} onrepair={id => { void startInstall(id); }}>
               {#snippet mods(instance: InstanceInfo)}<Mods {instance} {snapshot} onchange={load} onconfirm={(title, description, confirm) => { void openModal(title, description, false, confirm, t("确认删除")); }} />{/snippet}
             </SettingsForm>
           {:else if activePage === 'settings'}
             <div class="settings-tabs"><div class="segmented" role="group" aria-label={t("启动器设置分类")}>
-              <button class:selected={settingsTab === 'general'} aria-pressed={settingsTab === 'general'} onclick={() => { settingsTab = 'general'; selectedPluginId = ''; }}>{t("常规")}</button>
-              <button class:selected={settingsTab === 'plugins'} aria-pressed={settingsTab === 'plugins'} onclick={() => settingsTab = 'plugins'}>{t("插件")}</button>
-              <button class:selected={settingsTab === 'about'} aria-pressed={settingsTab === 'about'} onclick={() => { settingsTab = 'about'; selectedPluginId = ''; }}>{t("关于")}</button>
+              <button data-h-part="button" class:selected={settingsTab === 'general'} aria-pressed={settingsTab === 'general'} onclick={() => selectSettingsTab('general')}>{t("常规")}</button>
+              <button data-h-part="button" class:selected={settingsTab === 'theme'} aria-pressed={settingsTab === 'theme'} onclick={() => selectSettingsTab('theme')}>{t("主题")}</button>
+              <button data-h-part="button" class:selected={settingsTab === 'plugins'} aria-pressed={settingsTab === 'plugins'} onclick={() => selectSettingsTab('plugins')}>{t("插件")}</button>
+              <button data-h-part="button" class:selected={settingsTab === 'about'} aria-pressed={settingsTab === 'about'} onclick={() => selectSettingsTab('about')}>{t("关于")}</button>
             </div></div>
-            {#key settingsTab}<div class="tab-content" in:entrance|global>
-              {#if settingsTab === 'general'}<SettingsForm onprofiles={() => navigate('profiles')} {snapshot} onlogin={login} onchange={load} ondelete={deleteInstance} onimport={importLegacy} onrepair={id => { void startInstall(id); }} />
+            <!-- Keep drafts and open settings panels while visiting the theme tab. -->
+            <div class="tab-content" hidden={settingsTab !== 'general'}>
+              <SettingsForm onprofiles={() => navigate('profiles')} {snapshot} onlogin={login} onchange={load} ondelete={deleteInstance} onimport={importLegacy} onrepair={id => { void startInstall(id); }} />
+            </div>
+            {#if settingsTab !== 'general'}{#key settingsTab}<div class="tab-content" in:entrance|global>
+              {#if settingsTab === 'theme'}<div class="form-page"><div class="scroll-pane form-scroll"><AppearanceSettings {snapshot} onplugins={id => selectSettingsTab('plugins', id)} /></div></div>
               {:else if settingsTab === 'plugins'}<Plugins plugins={snapshot?.plugins ?? []} bind:selectedId={selectedPluginId} oninstall={installPlugin} onuninstall={uninstallPlugin} onrefresh={refreshPlugins} />
               {:else}<About version={snapshot?.version} />{/if}
-            </div>{/key}
+            </div>{/key}{/if}
           {:else if activePage === 'downloads'}<Downloads {snapshot} onchange={load} onhome={() => navigate('home')} onrepair={startInstall} startError={downloadError} />
           {:else if activePage === 'resources'}
             {#if resourcesAvailable}<Resources {snapshot} bind:trail={resourceTrail} onchange={load} />
@@ -275,15 +322,17 @@
       {/if}
       </div>
       {/each}
+      <PluginSlot {snapshot} location="status.items" context={{ instanceId: selected?.id }} onchange={load} />
       {#if error}<p class="error-toast" role="alert" in:entrance use:animateText={error}>{error}</p>{/if}
+      </div>
     </main>
     {#if modal}
       <div class="modal-overlay">
-        <button class="modal-scrim" tabindex="-1" disabled={modalPending} aria-label={t("关闭对话框")} onclick={() => closeModal()}></button>
-        <dialog open class="modal" aria-modal="true" aria-labelledby="modal-title" tabindex="-1" bind:this={modalElement} in:entrance>
+        <button data-h-part="button" class="modal-scrim" tabindex="-1" disabled={modalPending} aria-label={t("关闭对话框")} onclick={() => closeModal()}></button>
+        <dialog data-h-scope="popup" open class="modal" aria-modal="true" aria-labelledby="modal-title" tabindex="-1" bind:this={modalElement} in:entrance>
           <h2 id="modal-title">{modal.title}</h2><p>{modal.description}</p>
           {#if modalError}<p class="issue" role="alert">{modalError}</p>{/if}
-          <div class="modal-actions"><button disabled={modalPending} onclick={() => closeModal()}>{modal.install || modal.confirm ? t("取消") : t("知道了")}</button>{#if modal.confirm}<button class="primary" disabled={modalPending} onclick={confirmModal}>{modalPending ? t("正在处理…") : modal.confirmLabel}</button>{:else if modal.install}<button class="primary" disabled>{t("安装插件")}</button>{/if}</div>
+          <div class="modal-actions"><button data-h-part="button" disabled={modalPending} onclick={() => closeModal()}>{modal.install || modal.confirm ? t("取消") : t("知道了")}</button>{#if modal.confirm}<button data-h-part="button" data-h-variant="primary" class="primary" disabled={modalPending} onclick={confirmModal}>{modalPending ? t("正在处理…") : modal.confirmLabel}</button>{:else if modal.install}<button data-h-part="button" data-h-variant="primary" class="primary" disabled>{t("安装插件")}</button>{/if}</div>
         </dialog>
       </div>
     {/if}
@@ -291,3 +340,8 @@
   {#if !modal}{#each grips as grip}<div class={`resize-grip ${grip.edge}`} role="presentation" onpointerdown={event => resize(event, grip.direction)}></div>{/each}{/if}
 </div>
 {/key}
+<ThemeRecovery />
+<style>
+  .plugin-page { padding: 24px; overflow: auto; }
+  .plugin-page h1 { margin: 0 0 20px; font-size: calc(var(--h-font-size,16px) * 1.375); font-weight: 600; }
+</style>

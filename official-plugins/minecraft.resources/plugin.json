@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "apiVersion": 1,
   "id": "minecraft.resources",
   "name": "资源下载",
@@ -7,18 +7,61 @@
   "version": "1.0.0",
   "runtime": "native",
   "entry": "bin/plugin.dll",
-  "permissions": ["native.code"],
+  "permissions": [
+    "native.code"
+  ],
   "dependencies": [
-    { "id": "network", "version": "^1" },
-    { "id": "minecraft.download", "version": "^1" },
-    { "id": "minecraft.files", "version": "^1" },
-    { "id": "minecraft.mods", "version": "^1" }
+    {
+      "id": "network",
+      "version": "^1"
+    },
+    {
+      "id": "minecraft.download",
+      "version": "^1"
+    },
+    {
+      "id": "minecraft.files",
+      "version": "^1"
+    },
+    {
+      "id": "minecraft.mods",
+      "version": "^1"
+    }
   ],
   "provides": [
     {
       "id": "minecraft.resources",
       "version": "1.0.0",
-      "methods": ["filters", "search", "versions", "dependencies", "updates", "download", "downloadUpdates", "poll", "cancel"]
+      "methods": [
+        "filters",
+        "search",
+        "versions",
+        "dependencies",
+        "updates",
+        "download",
+        "downloadUpdates",
+        "poll",
+        "cancel",
+        "downloadPlan"
+      ]
     }
-  ]
+  ],
+  "contributes": {
+    "providers": [
+      {
+        "id": "modrinth",
+        "kind": "resourceSource",
+        "title": "Modrinth",
+        "service": "minecraft.resources",
+        "version": "1.0.0"
+      },
+      {
+        "id": "curseforge",
+        "kind": "resourceSource",
+        "title": "CurseForge",
+        "service": "minecraft.resources",
+        "version": "1.0.0"
+      }
+    ]
+  }
 }

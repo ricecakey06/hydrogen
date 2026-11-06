@@ -450,11 +450,16 @@ impl Launcher {
         components: Option<Components>,
     ) -> Result<String> {
         if let Some(component) = &components {
-            self.require(if matches!(component.kind.as_str(), "forge" | "neoforge") {
-                "minecraft.forge"
+            if component.kind.contains(':') {
+                self.plugins
+                    .provider(&self.lease().settings, "loaderProvider", &component.kind)?;
             } else {
-                "minecraft.fabric"
-            })?;
+                self.require(if matches!(component.kind.as_str(), "forge" | "neoforge") {
+                    "minecraft.forge"
+                } else {
+                    "minecraft.fabric"
+                })?;
+            }
         }
         let _lease = self.lease();
         let state = self.store.lock().unwrap().state();
@@ -462,6 +467,11 @@ impl Launcher {
         self.install(instance.info.id)
     }
     pub fn install(self: &Arc<Self>, id: String) -> Result<String> {
+        self.plugins.hooks(
+            &self.lease().settings,
+            "beforeInstall",
+            serde_json::json!({"instanceId":id}),
+        )?;
         let lease = self.instance_lock(&id)?;
         let root = self.lease();
         let instance = self.store.lock().unwrap().instance(&id)?;
@@ -582,15 +592,28 @@ impl Launcher {
         Ok(id)
     }
     pub fn restore(self: &Arc<Self>) {
-        let restore = {
-            let store = self.store.lock().unwrap();
-            !store.settings.offline_selected()
-                && store.settings.enabled("account.microsoft")
-                && !store.settings.microsoft_client_id.is_empty()
-                && has_saved_credentials(&self.accounts, &store.root, &store.settings)
+        let lease = self.lease();
+        let restore = if lease.settings.account_mode.contains(':') {
+            self.plugins
+                .provider(
+                    &lease.settings,
+                    "accountProvider",
+                    &lease.settings.account_mode,
+                )
+                .is_ok()
                 && self
                     .accounts
-                    .view(&store.root, &store.settings, false)
+                    .view(&lease.root, &lease.settings, false)
+                    .status
+                    != "signedIn"
+        } else {
+            !lease.settings.offline_selected()
+                && lease.settings.enabled("account.microsoft")
+                && !lease.settings.microsoft_client_id.is_empty()
+                && has_saved_credentials(&self.accounts, &lease.root, &lease.settings)
+                && self
+                    .accounts
+                    .view(&lease.root, &lease.settings, false)
                     .needs_restore()
         };
         if restore {

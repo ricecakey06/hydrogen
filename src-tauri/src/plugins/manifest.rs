@@ -29,12 +29,22 @@ pub struct Manifest {
     pub dependencies: Vec<serde_json::Value>,
     #[serde(default)]
     pub permissions: Vec<String>,
+    #[serde(default)]
+    pub scopes: Scopes,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub provides: Vec<Service>,
     #[serde(default)]
     pub contributes: Contributions,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub frontend: Option<Frontend>,
+}
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Scopes {
+    #[serde(default)]
+    pub http: Vec<String>,
+    #[serde(default)]
+    pub process: Vec<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -50,6 +60,60 @@ pub struct Contributions {
     pub commands: Vec<Command>,
     #[serde(default)]
     pub panels: Vec<Panel>,
+    #[serde(default)]
+    pub views: Vec<UiContribution>,
+    #[serde(default)]
+    pub menus: Vec<UiContribution>,
+    #[serde(default)]
+    pub providers: Vec<Provider>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub themes: Vec<super::themes::Contribution>,
+}
+pub const UI_LOCATIONS: &[&str] = &[
+    "sidebar.main",
+    "sidebar.footer",
+    "home.widgets",
+    "home.actions",
+    "settings.sections",
+    "instance.tabs",
+    "instance.toolbar",
+    "instance.contextMenu",
+    "mods.toolbar",
+    "mods.contextMenu",
+    "resources.actions",
+    "profiles.actions",
+    "downloads.taskActions",
+    "titlebar.actions",
+    "status.items",
+    "commands.palette",
+];
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct UiContribution {
+    #[serde(default)]
+    pub id: String,
+    pub location: String,
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub panel: Option<String>,
+    #[serde(default)]
+    pub command: Option<String>,
+    #[serde(default)]
+    pub order: i32,
+    #[serde(default)]
+    pub group: String,
+    #[serde(default)]
+    pub when: Option<String>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Provider {
+    pub id: String,
+    pub kind: String,
+    pub title: String,
+    pub service: String,
+    pub version: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -70,6 +134,14 @@ pub struct Panel {
     pub id: String,
     pub title: String,
     pub entry: String,
+    #[serde(default = "inherit", skip_serializing_if = "is_inherit")]
+    pub appearance: String,
+}
+fn inherit() -> String {
+    "inherit".into()
+}
+fn is_inherit(value: &str) -> bool {
+    value == "inherit"
 }
 
 #[derive(Debug, Clone)]
@@ -193,19 +265,18 @@ pub fn load(root: &Path) -> Result<Plugin> {
         return Err(ApiError::new("MANIFEST_TOO_LARGE", "清单不能超过 64 KiB。"));
     }
     let value: serde_json::Value = serde_json::from_slice(&fs::read(path)?)?;
-    if value["schemaVersion"] != 2
-        || !matches!(value["runtime"].as_str(), Some("javascript" | "native"))
-    {
-        return Err(ApiError::new(
-            "INCOMPATIBLE_PLUGIN",
-            "仅支持 schemaVersion 2 的 JavaScript 或原生 ABI v1 插件；旧 DLL 插件不兼容。",
-        ));
-    }
     let manifest: Manifest = serde_json::from_value(value)?;
-    if manifest.schema_version != 2 || manifest.api_version != 1 {
+    if !matches!(
+        (
+            manifest.runtime.as_str(),
+            manifest.schema_version,
+            manifest.api_version
+        ),
+        ("javascript", 3, 2) | ("native", 2 | 3, 1)
+    ) {
         return Err(ApiError::new(
             "INCOMPATIBLE_PLUGIN",
-            "仅支持 schemaVersion 2 / API 1 的 JavaScript 或原生 ABI v1 插件；不执行旧 DLL 插件。",
+            "JavaScript 插件需要 schemaVersion 3 / API 2；原生插件需要 schemaVersion 2 或 3 / ABI 1。",
         ));
     }
     if !valid_id(&manifest.id) {
@@ -234,10 +305,36 @@ pub fn load(root: &Path) -> Result<Plugin> {
     }
     let allowed = [
         "instances.read",
+        "instances.write",
+        "instances.repair",
+        "instances.launch",
+        "accounts.read",
+        "accounts.write",
+        "java.read",
+        "java.scan",
+        "resources.read",
+        "resources.install",
+        "mods.read",
+        "mods.write",
+        "modpacks.read",
+        "modpacks.write",
+        "settings.read",
+        "settings.write",
+        "storage",
+        "http",
+        "files",
+        "process",
+        "tasks.read",
+        "tasks.cancel",
+        "events",
+        "hooks",
+        "services.call",
+        "log",
         "ui.contribute",
         "ui.panel",
         "native.code",
         "ui.host",
+        "theme.contribute",
     ];
     if manifest
         .permissions
@@ -248,6 +345,35 @@ pub fn load(root: &Path) -> Result<Plugin> {
             "UNSUPPORTED_PERMISSION",
             "清单请求了宿主尚未提供的能力。",
         ));
+    }
+    if manifest.scopes.http.len() > 64
+        || manifest.scopes.process.len() > 16
+        || manifest.scopes.http.iter().any(|host| {
+            host.is_empty()
+                || host.len() > 253
+                || host.contains(['/', ':', '@', '*', ' '])
+                || !manifest.permissions.iter().any(|p| p == "http")
+        })
+        || manifest.scopes.process.iter().any(|path| {
+            !Path::new(path).is_absolute()
+                || path.len() > 4096
+                || !manifest.permissions.iter().any(|p| p == "process")
+        })
+    {
+        return Err(ApiError::new(
+            "INVALID_SCOPE",
+            "网络域名或进程范围声明无效。",
+        ));
+    }
+    if manifest.runtime == "javascript"
+        && manifest.activation.iter().any(|event| {
+            event != "startup"
+                && !["command:", "view:", "service:", "provider:", "hook:"]
+                    .iter()
+                    .any(|prefix| event.starts_with(prefix))
+        })
+    {
+        return Err(ApiError::new("INVALID_ACTIVATION", "激活事件不受支持。"));
     }
     let mut ids = HashSet::new();
     for c in &manifest.contributes.commands {
@@ -265,7 +391,96 @@ pub fn load(root: &Path) -> Result<Plugin> {
                 "面板 ID 必须唯一，入口必须在 ui/ 内。",
             ));
         }
+        if !["inherit", "independent"].contains(&p.appearance.as_str()) {
+            return Err(ApiError::new("INVALID_PANEL", "面板 appearance 无效。"));
+        }
         within(&root, &p.entry)?;
+    }
+    for (index, item) in manifest
+        .contributes
+        .views
+        .iter()
+        .chain(&manifest.contributes.menus)
+        .enumerate()
+    {
+        if !manifest.permissions.iter().any(|p| p == "ui.contribute")
+            || !UI_LOCATIONS.contains(&item.location.as_str())
+            || (!item.id.is_empty() && (!valid_id(&item.id) || !ids.insert(&item.id)))
+            || (item.panel.is_some() == item.command.is_some())
+            || (item.location == "instance.tabs" && item.panel.is_none())
+            || item
+                .panel
+                .as_ref()
+                .is_some_and(|id| !manifest.contributes.panels.iter().any(|p| &p.id == id))
+            || item
+                .command
+                .as_ref()
+                .is_some_and(|id| !manifest.contributes.commands.iter().any(|c| &c.id == id))
+            || !matches!(
+                item.when.as_deref(),
+                None | Some("instanceSelected" | "modsSelected" | "taskActive")
+            )
+            || item.title.len() > 200
+            || item.group.len() > 100
+            || index >= 128
+        {
+            return Err(ApiError::new(
+                "INVALID_UI_CONTRIBUTION",
+                "界面贡献的位置、引用、条件或权限无效。",
+            ));
+        }
+    }
+    let mut provider_ids = HashSet::new();
+    for provider in &manifest.contributes.providers {
+        if !valid_id(&provider.id)
+            || !provider_ids.insert(&provider.id)
+            || ![
+                "resourceSource",
+                "accountProvider",
+                "loaderProvider",
+                "downloadSource",
+            ]
+            .contains(&provider.kind.as_str())
+            || provider.title.is_empty()
+            || provider.title.len() > 200
+            || provider.version != "1.0.0"
+            || !manifest.provides.iter().any(|s| s.id == provider.service)
+        {
+            return Err(ApiError::new(
+                "INVALID_PROVIDER",
+                "提供者必须引用已声明服务和受支持的契约。",
+            ));
+        }
+    }
+    if manifest.runtime == "javascript" {
+        for provider in &manifest.contributes.providers {
+            let required: &[&str] = match provider.kind.as_str() {
+                "resourceSource" => &[
+                    "filters",
+                    "search",
+                    "versions",
+                    "dependencies",
+                    "downloadPlan",
+                ],
+                "accountProvider" => &["view", "signIn", "session", "signOut"],
+                "loaderProvider" => &["versions", "installPlan"],
+                "downloadSource" => &["resolve"],
+                _ => &[],
+            };
+            if !manifest.provides.iter().any(|s| {
+                s.id == provider.service
+                    && semver::Version::parse(&s.version)
+                        .is_ok_and(|v| semver::VersionReq::parse("^1").unwrap().matches(&v))
+                    && required
+                        .iter()
+                        .all(|method| s.methods.iter().any(|m| m == method))
+            }) {
+                return Err(ApiError::new(
+                    "INVALID_PROVIDER",
+                    "JS 提供者缺少契约要求的方法或服务版本不兼容。",
+                ));
+            }
+        }
     }
     let mut services = HashSet::new();
     for service in &manifest.provides {
@@ -339,11 +554,13 @@ pub fn load(root: &Path) -> Result<Plugin> {
     }
     within(&root, &manifest.entry)?;
     let (_, digest) = super::package::files(&root)?;
-    Ok(Plugin {
+    let plugin = Plugin {
         root,
         manifest,
         digest,
-    })
+    };
+    super::themes::validate(&plugin)?;
+    Ok(plugin)
 }
 
 // Runtime calls execute already verified shadow libraries. Check the package tree
@@ -427,7 +644,7 @@ mod runtime_cache_tests {
 
     fn fixture() -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("plugin.json"), r#"{"schemaVersion":2,"apiVersion":1,"id":"cache.test","name":"Cache","version":"1.0.0","runtime":"javascript","entry":"main.js","permissions":[]}"#).unwrap();
+        fs::write(dir.path().join("plugin.json"), r#"{"schemaVersion":3,"apiVersion":2,"id":"cache.test","name":"Cache","version":"1.0.0","runtime":"javascript","entry":"main.js","permissions":[]}"#).unwrap();
         fs::write(dir.path().join("main.js"), "export const value = 1;").unwrap();
         dir
     }

@@ -71,7 +71,7 @@
           {#if version}<p class="caption">{t("启动器版本 {0}", version)}</p>{/if}
         </div>
       </div>
-      <button type="button" class="primary" disabled={checking || !version} onclick={checkUpdate}>
+      <button data-h-part="button" data-h-variant="primary" type="button" class="primary" disabled={checking || !version} onclick={checkUpdate}>
         <Icon name="refresh" size={16} />{checking ? t("正在检查更新…") : t("检查更新")}
       </button>
     </div>
@@ -124,14 +124,14 @@
       {#if loading}<p class="caption" role="status">{t("正在读取许可证…")}</p>
       {:else if licenseError}
         <p class="issue" role="alert">{licenseError}</p>
-        <button type="button" onclick={loadNotices}>{t("重试")}</button>
+        <button data-h-part="button" type="button" onclick={loadNotices}>{t("重试")}</button>
       {:else if notices}
         <p class="caption">{t("共 {0} 项，包含前端、原生启动器及官方插件的依赖。", notices.packages.length)}</p>
         <label class="caption" for="about-license-search">{t("按名称、版本或许可证筛选")}</label>
-        <input id="about-license-search" type="search" bind:value={query} />
+        <input data-h-part="input-shell" id="about-license-search" type="search" bind:value={query} />
         {#if displayed}
           <label class="caption" for="about-license-package">{t("依赖项")}</label>
-          <select id="about-license-package" value={displayed} onchange={event => selected = matches[event.currentTarget.selectedIndex]}>
+          <select data-h-part="input-shell" id="about-license-package" value={displayed} onchange={event => selected = matches[event.currentTarget.selectedIndex]}>
             {#each matches as item (`${item.ecosystem}/${item.name}/${item.version}`)}
               <option value={item}>{item.name} {item.version} · {item.ecosystem}</option>
             {/each}
@@ -147,8 +147,8 @@
 <style>
   .about-page { padding-bottom: 24px; }
   section + section { margin-top: 20px; }
-  .about-overview, .about-person, details { background: #f2f3f6; border-radius: 8px; padding: 12px 16px; }
-  .about-overview h2 { font-size: 24px; font-weight: 600; }
+  .about-overview, .about-person, details { background: var(--h-surface-sidebar); border-radius: 8px; padding: 12px 16px; }
+  .about-overview h2 { font-size: calc(var(--h-font-size,16px) * 1.5); font-weight: 600; }
   .about-overview .caption:empty { display: none; }
   .about-version { flex-wrap: wrap; }
   .primary, .about-person, .about-product { display: flex; align-items: center; gap: 12px; }
@@ -161,5 +161,5 @@
   details + details { margin-top: 8px; }
   summary { cursor: pointer; }
   label { display: block; margin: 12px 0 4px; }
-  pre { margin: 8px 0 0; max-inline-size: 75ch; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; font-size: 13px; line-height: 1.6; }
+  pre { margin: 8px 0 0; max-inline-size: 75ch; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; font-size: calc(var(--h-font-size,16px) * 0.8125); line-height: 1.6; }
 </style>

@@ -515,6 +515,56 @@ async fn download_files(
     Ok(paths)
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ExternalFile {
+    filename: String,
+    url: String,
+    sha1: String,
+    size: u64,
+}
+async fn external_download(_client: &Client, params: &Value, job: &Job) -> Result<Value> {
+    let plan: Vec<ExternalFile> = serde_json::from_value(params["plan"].clone())?;
+    if plan.is_empty() || plan.len() > 128 {
+        return Err(invalid("下载计划需要 1 至 128 个文件。"));
+    }
+    let mut names = BTreeSet::new();
+    for file in &plan {
+        let url = Url::parse(&file.url).map_err(|_| invalid("下载 URL 无效。"))?;
+        if !params["allowedHosts"]
+            .as_array()
+            .is_some_and(|hosts| hosts.iter().any(|h| h.as_str() == url.host_str()))
+            || !storage::safe_relative(&file.filename)
+            || file.filename.contains('/')
+            || !file.filename.ends_with(".jar")
+            || !names.insert(file.filename.to_lowercase())
+            || file.sha1.len() != 40
+            || !file.sha1.bytes().all(|b| b.is_ascii_hexdigit())
+            || file.size == 0
+            || file.size > 1024 * 1024 * 1024
+            || !matches!(url.scheme(), "https" | "http")
+            || !url.username().is_empty()
+            || url.password().is_some()
+        {
+            return Err(invalid("下载计划包含非法文件、哈希、大小或地址。"));
+        }
+    }
+    let root = Path::new(text(params, "root")?);
+    job.phase("downloading", "正在下载提供者资源…");
+    job.begin_download(
+        plan.iter().map(|f| (f.filename.clone(), Some(f.size))),
+        true,
+    );
+    let mut paths = Vec::new();
+    for file in plan {
+        job.check()?;
+        let cache = storage::within(root, &format!("cache/provider-downloads/{}", file.sha1))?;
+        let path=hydrogen_plugin_services::jobs::service_task("minecraft.download","once",json!({"root":cache,"relative":file.filename,"url":file.url,"hash":file.sha1,"size":file.size}),job).await?;
+        paths.push(serde_json::from_value::<PathBuf>(path)?);
+    }
+    Ok(json!(paths))
+}
+
 impl State {
     fn call(&mut self, request: &Value) -> Result<Value> {
         let params = &request["params"];
@@ -531,7 +581,7 @@ impl State {
                 return Ok(Value::Null);
             }
             "filters" | "search" | "versions" | "dependencies" | "updates" | "download"
-            | "downloadUpdates" => {}
+            | "downloadUpdates" | "downloadPlan" => {}
             _ => return Err(invalid("未知资源下载服务方法。")),
         }
         let client = Client::new(&PluginHost, &Settings::default())?;
@@ -564,6 +614,7 @@ impl State {
                     )
                     .await
                 }
+                "downloadPlan" => external_download(&client, &params, &job).await,
                 "updates" => updates(&client, &params, &job).await,
                 "downloadUpdates" => download_updates(&client, &params, &job).await,
                 _ => download(&client, &params, &job).await,

@@ -6,6 +6,8 @@ use std::collections::BTreeMap;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Settings {
+    #[serde(default)]
+    pub theme: hydrogen_plugin_sdk::contracts::ThemeChoice,
     #[serde(default = "default_locale")]
     pub locale: String,
     #[serde(default)]

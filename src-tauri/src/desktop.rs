@@ -27,9 +27,11 @@ struct PendingPlugin {
 }
 struct AppState {
     host: PluginHost,
+    safe_theme: bool,
+    theme_announced: AtomicU64,
     plugins: Mutex<Vec<Plugin>>,
     development: Vec<Plugin>,
-    plugin_mutation: tokio::sync::Mutex<()>,
+    plugin_mutation: tokio::sync::RwLock<()>,
     plugin_candidates: Mutex<std::collections::BTreeMap<String, PendingPlugin>>,
     core: Arc<crate::launcher::core::Launcher>,
     panels: Panels,
@@ -39,6 +41,7 @@ struct AppState {
     panel_navigation_guard: AtomicBool,
     appearance: Mutex<crate::window::Appearance>,
     dropped_files: Mutex<std::collections::BTreeMap<String, (Instant, Vec<PathBuf>)>>,
+    event_sequences: Mutex<std::collections::BTreeMap<String, u64>>,
     legacy_imports:
         Mutex<std::collections::BTreeMap<String, (Instant, crate::launcher::migration::Plan)>>,
 }
@@ -83,6 +86,10 @@ struct PluginView {
     enabled: bool,
     problem: String,
     dependencies: Vec<serde_json::Value>,
+    views: Vec<manifest::UiContribution>,
+    menus: Vec<manifest::UiContribution>,
+    providers: Vec<manifest::Provider>,
+    diagnostics: Vec<String>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -106,6 +113,19 @@ async fn app_snapshot(window: WebviewWindow, state: State<'_, AppState>) -> Resu
     state
         .host
         .set_instances(launcher.instances.iter().map(|i| i.info.clone()).collect());
+    {
+        let mut seen = state.event_sequences.lock().unwrap();
+        for task in &launcher.tasks {
+            if seen.insert(task.id.clone(), task.sequence) != Some(task.sequence) {
+                let event = serde_json::json!({"id":task.id,"instanceId":task.instance_id,"phase":task.phase,"completed":task.completed,"total":task.total,"sequence":task.sequence});
+                state.host.emit("task.updated", event.clone());
+                if task.kind == "launch" && ["failed", "exited"].contains(&task.phase.as_str()) {
+                    state.host.emit("game.exited", event);
+                }
+            }
+        }
+        seen.retain(|id, _| launcher.tasks.iter().any(|t| &t.id == id));
+    }
     let installed = state.plugins.lock().unwrap();
     let statuses = crate::plugins::manager::statuses(&installed, &launcher.settings);
     let plugins = installed
@@ -139,6 +159,10 @@ async fn app_snapshot(window: WebviewWindow, state: State<'_, AppState>) -> Resu
             enabled: crate::plugins::manager::enabled(&launcher.settings, &p.manifest.id),
             problem: statuses.get(&p.manifest.id).cloned().unwrap_or_default(),
             dependencies: p.manifest.dependencies.clone(),
+            views: p.manifest.contributes.views.clone(),
+            menus: p.manifest.contributes.menus.clone(),
+            providers: p.manifest.contributes.providers.clone(),
+            diagnostics: state.host.diagnostics(&p.manifest.id),
         })
         .collect();
     Ok(Snapshot {
@@ -259,6 +283,25 @@ enum LauncherAction {
         version_id: String,
         source: Option<String>,
     },
+    ThemeCatalog,
+    ThemePrepare {
+        choice: crate::plugins::themes::Choice,
+        system_dark: bool,
+        high_contrast: bool,
+    },
+    ThemeApply {
+        token: String,
+        preview: bool,
+    },
+    ThemeConfirm {
+        token: String,
+    },
+    ThemeCancel,
+    ThemeRelease {
+        token: String,
+    },
+    ThemeState,
+    ThemeRestore,
     SaveSettings {
         settings: crate::launcher::storage::Settings,
     },
@@ -271,6 +314,10 @@ enum LauncherAction {
     ForgeOptions {
         version: String,
         kind: String,
+    },
+    LoaderOptions {
+        provider: String,
+        version: String,
     },
     FabricOptions {
         version: String,
@@ -297,6 +344,10 @@ enum LauncherAction {
     SignIn,
     SignOut,
     ProfileAddMicrosoft,
+    ProfileAddProvider {
+        provider: String,
+        name: String,
+    },
     ProfileAddOffline {
         name: String,
     },
@@ -351,7 +402,7 @@ async fn launcher_action(
     action: LauncherAction,
 ) -> Result<serde_json::Value> {
     main_document(&window)?;
-    // ponytail: one command gate prevents task-start / provider-update races; use provider leases when tasks expose their dependency scopes.
+    // Mutation holds the write gate only through validation and commit; JS calls carry usage leases.
     let _guard = if matches!(
         &action,
         LauncherAction::ResourceFilters { .. }
@@ -364,8 +415,46 @@ async fn launcher_action(
     ) {
         None
     } else {
-        Some(state.plugin_mutation.lock().await)
+        Some(state.plugin_mutation.write().await)
     };
+    let affected =
+        match &action {
+            LauncherAction::PluginToggle { id, .. }
+            | LauncherAction::PluginUninstall { id, .. } => Some(
+                crate::plugins::manager::affected(&state.plugins.lock().unwrap(), id),
+            ),
+            LauncherAction::PluginInstall { token } => state
+                .plugin_candidates
+                .lock()
+                .unwrap()
+                .get(token)
+                .map(|pending| {
+                    crate::plugins::manager::affected(
+                        &state.plugins.lock().unwrap(),
+                        &pending.candidate.plugin.manifest.id,
+                    )
+                }),
+            _ => None,
+        };
+    let busy = affected
+        .as_ref()
+        .map_or_else(|| state.host.busy(), |ids| state.host.busy_plugins(ids));
+    if matches!(
+        &action,
+        LauncherAction::PluginInstall { .. }
+            | LauncherAction::PluginToggle { .. }
+            | LauncherAction::PluginUninstall { .. }
+            | LauncherAction::PluginRefresh
+            | LauncherAction::SaveSettings { .. }
+            | LauncherAction::ChangeDataDirectory
+            | LauncherAction::ChangeGameDirectory
+    ) && busy
+    {
+        return Err(ApiError::new(
+            "PLUGIN_BUSY",
+            "插件仍有在途操作，请稍后重试。",
+        ));
+    }
     let core = state.core.clone();
     let value = match action {
         LauncherAction::CheckLauncherUpdate => {
@@ -439,7 +528,7 @@ async fn launcher_action(
             }
         }
         LauncherAction::PluginInstall { token } => {
-            if core.tasks.busy(None) {
+            if core.tasks.busy(None) && !state.plugin_candidates.lock().unwrap().get(&token).is_some_and(|pending|crate::plugins::themes::standalone(&pending.candidate.plugin)) {
                 return Err(ApiError::new(
                     "PLUGIN_BUSY",
                     "请等待任务和游戏结束后更新插件。",
@@ -483,7 +572,7 @@ async fn launcher_action(
             if !known {
                 return Err(ApiError::new("UNKNOWN_PLUGIN", "插件不存在。"));
             }
-            if core.tasks.busy(None) {
+            if core.tasks.busy(None) && !state.plugins.lock().unwrap().iter().any(|p|p.manifest.id == id && crate::plugins::themes::standalone(p)) {
                 return Err(ApiError::new(
                     "PLUGIN_BUSY",
                     "请等待当前任务和游戏结束后更改插件状态。",
@@ -494,7 +583,9 @@ async fn launcher_action(
             if enabled {
                 crate::plugins::manager::order(&state.plugins.lock().unwrap(), &settings, &id)?;
             }
-            core.save_settings(settings)?;
+            let previous_theme = state.host.themes.cancel();
+            if !enabled { state.host.themes.invalidate(std::slice::from_ref(&id), "THEME_UNAVAILABLE: 主题插件已停用")?; }
+            if let Err(error) = core.save_settings(settings) { state.host.themes.restore_failed_invalidation(&previous_theme); return Err(error); }
             invalidate_plugin(&state, &id).await?;
             if id == "account.offline" && !enabled {
                 core.restore();
@@ -506,7 +597,7 @@ async fn launcher_action(
             digest,
             confirmed,
         } => {
-            if core.tasks.busy(None) {
+            if core.tasks.busy(None) && !state.plugins.lock().unwrap().iter().any(|p|p.manifest.id == id && crate::plugins::themes::standalone(p)) {
                 return Err(ApiError::new(
                     "PLUGIN_BUSY",
                     "请等待任务和游戏结束后卸载插件。",
@@ -525,7 +616,9 @@ async fn launcher_action(
                 .find(|p| p.manifest.id == id && p.digest == digest)
                 .cloned()
                 .ok_or_else(|| ApiError::new("PLUGIN_CHANGED", "插件已变化，请刷新后重试。"))?;
-            crate::plugins::manager::uninstall(&lease.root, &plugin)?;
+            let previous_theme = state.host.themes.cancel();
+            state.host.themes.invalidate(std::slice::from_ref(&id), "THEME_UNAVAILABLE: 主题插件已卸载")?;
+            if let Err(error) = crate::plugins::manager::uninstall(&lease.root, &plugin) { state.host.themes.restore_failed_invalidation(&previous_theme); return Err(error); }
             invalidate_plugin(&state, &id).await?;
             refresh_plugins(&state)?;
             serde_json::Value::Null
@@ -564,8 +657,8 @@ async fn launcher_action(
                 }
             }
             if !affected.is_empty() {
+                state.panels.close_plugins(&affected);
                 state.host.stop_plugins(affected).await?;
-                state.panels.clear();
                 state.generation.fetch_add(1, Ordering::SeqCst);
             }
             serde_json::Value::Null
@@ -699,7 +792,60 @@ async fn launcher_action(
         LauncherAction::ResourceDownload { id, project, version_id, source } => {
             serde_json::to_value(core.download_mod(id, project, version_id, source)?)?
         }
-        LauncherAction::SaveSettings { settings } => {
+        LauncherAction::ThemeCatalog => crate::plugins::themes::catalog(&state.host, &core.lease().settings, &state.plugins.lock().unwrap()),
+        LauncherAction::ThemePrepare { choice, system_dark, high_contrast } => {
+            let host = state.host.clone(); let settings = core.lease().settings.clone(); let safe = state.safe_theme;
+            let visual = tauri::async_runtime::spawn_blocking(move || host.themes.prepare(&host, &settings, choice, system_dark, high_contrast, safe)).await
+                .map_err(|_| ApiError::new("THEME_INVALID", "主题准备任务异常结束。"))??;
+            serde_json::to_value(visual)?
+        }
+        LauncherAction::ThemeApply { token, preview } => {
+            let visual = state.host.themes.commit(&token, preview)?;
+            let opaque = state.safe_theme || visual.active.as_ref().is_some_and(|v| v.high_contrast || v.choice.material == "opaque");
+            match crate::window::apply_preferences(&window, &core, opaque) {
+                Ok(appearance) => *state.appearance.lock().unwrap() = appearance,
+                Err(e) => *state.appearance.lock().unwrap() = crate::window::Appearance {material:"solid".into(),reason:e.message,rounded:false},
+            }
+            state.theme_announced.store(visual.revision,Ordering::SeqCst);
+            state.host.emit("theme.changed", visual.public_appearance());
+            serde_json::to_value(visual)?
+        }
+        LauncherAction::ThemeConfirm { token } => {
+            let active = state.host.themes.state().active.ok_or_else(|| ApiError::new("THEME_STALE", "无活动主题。"))?;
+            if let Some(digest) = active.package_digest.as_ref() {
+                let id = active.actual_id.split_once(':').unwrap().0;
+                if state.host.checked(&core.lease().settings,id)?.digest != *digest { return Err(ApiError::new("THEME_STALE", "主题包已变化。")); }
+            }
+            let result = state.host.themes.confirm(&token, |choice| { let mut settings = core.lease().settings.clone(); settings.theme = choice; core.save_settings(settings) });
+            let visual = result?;
+            state.theme_announced.store(visual.revision,Ordering::SeqCst);
+            state.host.emit("theme.changed", visual.public_appearance());
+            serde_json::to_value(visual)?
+        }
+        LauncherAction::ThemeCancel => {
+            let visual=state.host.themes.cancel();
+            let opaque=state.safe_theme || visual.active.as_ref().is_some_and(|v|v.high_contrast || v.choice.material=="opaque");
+            if let Ok(material)=crate::window::apply_preferences(&window,&core,opaque) {*state.appearance.lock().unwrap()=material;}
+            state.theme_announced.store(visual.revision,Ordering::SeqCst);
+            state.host.emit("theme.changed", visual.public_appearance());
+            serde_json::to_value(visual)?
+        },
+        LauncherAction::ThemeRelease { token } => {state.host.themes.release(&token); serde_json::Value::Null},
+        LauncherAction::ThemeState => {
+            let visual=state.host.themes.state();
+            if state.theme_announced.swap(visual.revision,Ordering::SeqCst)!=visual.revision {
+                let opaque=state.safe_theme || visual.active.as_ref().is_some_and(|v|v.high_contrast || v.choice.material=="opaque");
+                if let Ok(material)=crate::window::apply_preferences(&window,&core,opaque) {*state.appearance.lock().unwrap()=material;}
+                state.host.emit("theme.changed",visual.public_appearance());
+            }
+            serde_json::to_value(visual)?
+        },
+        LauncherAction::ThemeRestore => {
+            let mut settings = core.lease().settings.clone(); settings.theme = Default::default(); core.save_settings(settings)?;
+            state.host.themes.cancel(); state.host.themes.clear(); serde_json::Value::Null
+        }
+        LauncherAction::SaveSettings { mut settings } => {
+            settings.theme = core.lease().settings.theme.clone();
             let restore_account = {
                 let store = core.store.lock().unwrap();
                 store.settings.account_mode != settings.account_mode
@@ -728,6 +874,7 @@ async fn launcher_action(
                 .into_iter()
                 .next()
             {
+                state.host.themes.clear();
                 core.change_root(path)?;
                 state.panels.clear();
                 state.generation.fetch_add(1, Ordering::SeqCst);
@@ -763,6 +910,7 @@ async fn launcher_action(
         LauncherAction::ForgeOptions { version, kind } => {
             core.forge_options(&version, &kind).await?
         }
+        LauncherAction::LoaderOptions { provider, version } => core.plugins.provider_call(&core.lease().settings,"loaderProvider",&provider,"versions",serde_json::json!({"gameVersion":version})).await?,
         LauncherAction::FabricOptions { version } => core.fabric_options(&version).await?,
         LauncherAction::CreateInstance {
             version,
@@ -800,6 +948,7 @@ async fn launcher_action(
                 serde_json::Value::Null
             }
         }
+        LauncherAction::ProfileAddProvider { provider, name } => core.profile_change("profiles.addProvider",serde_json::json!({"provider":provider,"name":name}))?,
         LauncherAction::ProfileAddMicrosoft => serde_json::to_value(core.add_microsoft_profile()?)?,
         LauncherAction::ProfileAddOffline { name } => {
             core.profile_change("profiles.addOffline", serde_json::json!({"name":name}))?
@@ -900,6 +1049,7 @@ async fn launcher_action(
 }
 fn plugin(state: &AppState, id: &str) -> Result<Plugin> {
     let settings = state.core.store.lock().unwrap().settings.clone();
+    state.host.set_settings(&settings);
     let plugins = state.plugins.lock().unwrap();
     let plugin = plugins
         .iter()
@@ -963,8 +1113,9 @@ fn load_plugins(
 }
 async fn invalidate_plugin(state: &AppState, id: &str) -> Result<()> {
     let affected = crate::plugins::manager::affected(&state.plugins.lock().unwrap(), id);
+    state.host.themes.cancel();
+    state.panels.close_plugins(&affected);
     state.host.stop_plugins(affected).await?;
-    state.panels.clear();
     state.generation.fetch_add(1, Ordering::SeqCst);
     Ok(())
 }
@@ -988,14 +1139,22 @@ async fn plugin_run(
     state: State<'_, AppState>,
     plugin_id: String,
     command: String,
+    params: Option<serde_json::Value>,
 ) -> Result<RunReport> {
     main_document(&window)?;
     let _lease = state.core.lease();
-    let _guard = state.plugin_mutation.lock().await;
+    let _guard = state.plugin_mutation.read().await;
+    let _usage = state.host.lease(&plugin_id);
+    drop(_guard);
     activate_dependencies(&state, &plugin_id).await?;
     state
         .host
-        .run(plugin(&state, &plugin_id)?, command, false)
+        .run_params(
+            plugin(&state, &plugin_id)?,
+            command,
+            params.unwrap_or_default(),
+            false,
+        )
         .await
 }
 #[tauri::command]
@@ -1007,8 +1166,17 @@ async fn plugin_reload(
 ) -> Result<RunReport> {
     main_document(&window)?;
     let lease = state.core.lease();
-    let _guard = state.plugin_mutation.lock().await;
-    if state.core.tasks.busy(None) {
+    let _guard = state.plugin_mutation.write().await;
+    let affected = crate::plugins::manager::affected(&state.plugins.lock().unwrap(), &plugin_id);
+    if state.core.tasks.busy(None)
+        && !state
+            .plugins
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|p| p.manifest.id == plugin_id && crate::plugins::themes::standalone(p))
+        || state.host.busy_plugins(&affected)
+    {
         return Err(ApiError::new(
             "PLUGIN_BUSY",
             "请等待任务和游戏结束后重载插件。",
@@ -1060,11 +1228,14 @@ async fn plugin_reload(
         .into_iter()
         .filter(|id| id != &plugin_id)
         .collect();
+    state
+        .panels
+        .close_plugins(&crate::plugins::manager::affected(&plugins, &plugin_id));
     state.host.stop_plugins(consumers).await?;
     state.host.set_plugins(plugins.clone());
     *state.plugins.lock().unwrap() = plugins;
-    state.panels.clear();
     state.generation.fetch_add(1, Ordering::SeqCst);
+    state.host.themes.cancel();
     if let Some(command) = command {
         state.host.run(checked, command, false).await
     } else {
@@ -1072,7 +1243,7 @@ async fn plugin_reload(
     }
 }
 #[tauri::command]
-fn panel_open(
+async fn panel_open(
     window: WebviewWindow,
     state: State<'_, AppState>,
     plugin_id: String,
@@ -1085,11 +1256,13 @@ fn panel_open(
             "当前平台的面板导航隔离未通过初始化。",
         ));
     }
-    state.panels.open(
-        plugin(&state, &plugin_id)?,
-        &panel,
-        state.generation.load(Ordering::SeqCst),
-    )
+    let _guard = state.plugin_mutation.read().await;
+    let _usage = state.host.lease(&plugin_id);
+    drop(_guard);
+    activate_dependencies(&state, &plugin_id).await?;
+    let checked = plugin(&state, &plugin_id)?;
+    let report = state.host.activate(checked.clone()).await?;
+    state.panels.open(checked, &panel, report.generation)
 }
 #[tauri::command]
 async fn panel_call(
@@ -1098,17 +1271,49 @@ async fn panel_call(
     session_id: String,
     generation: u64,
     command: String,
+    params: Option<serde_json::Value>,
 ) -> Result<RunReport> {
     main_document(&window)?;
     let _lease = state.core.lease();
-    let _guard = state.plugin_mutation.lock().await;
+    let _guard = state.plugin_mutation.read().await;
     let plugin = state.panels.plugin(&session_id, generation)?;
     let checked = crate::desktop::plugin(&state, &plugin.manifest.id)?;
     if checked.digest != plugin.digest {
         return Err(ApiError::new("STALE_PANEL", "插件已更新，请重新打开面板。"));
     }
+    let _usage = state.host.lease(&plugin.manifest.id);
+    drop(_guard);
     activate_dependencies(&state, &plugin.manifest.id).await?;
-    state.host.run(plugin, command, false).await
+    if let Some(method) = command.strip_prefix('$') {
+        state
+            .host
+            .panel_task(
+                plugin,
+                generation,
+                method.into(),
+                params.unwrap_or_default(),
+            )
+            .await
+    } else {
+        state
+            .host
+            .run_params(plugin, command, params.unwrap_or_default(), false)
+            .await
+    }
+}
+#[tauri::command]
+fn panel_theme(
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+    session_id: String,
+    revision: u64,
+    token: String,
+    ready: bool,
+) -> Result<()> {
+    main_document(&window)?;
+    state
+        .panels
+        .bind_theme(&session_id, revision, &token, &state.host.themes, ready)
 }
 #[tauri::command]
 fn panel_close(
@@ -1166,9 +1371,11 @@ pub fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let mut ready_file = None;
     let mut webview_data = None;
     let mut data_root = None;
+    let mut safe_theme = false;
     let mut iter = args.iter();
     while let Some(argument) = iter.next() {
         match argument.as_str() {
+            "--safe-theme" => safe_theme = true,
             "--data-dir" => {
                 data_root = Some(PathBuf::from(iter.next().ok_or("--data-dir 需要完整目录")?));
             }
@@ -1216,7 +1423,17 @@ pub fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
             let state = context.app_handle().state::<AppState>();
             let settings = state.core.store.lock().unwrap().settings.clone();
             let result = if request.method() == "GET" {
-                crate::plugins::frontend::resource(&state.host, &settings, request.uri().path())
+                if request.uri().path().starts_with("/@theme/") {
+                    state.host.themes.resource(request.uri().path(), false)
+                } else if request.uri().path().starts_with("/@theme-preview/") {
+                    crate::plugins::themes::preview_resource(
+                        &state.host,
+                        &settings,
+                        request.uri().path(),
+                    )
+                } else {
+                    crate::plugins::frontend::resource(&state.host, &settings, request.uri().path())
+                }
             } else {
                 Err(ApiError::new("METHOD_DENIED", "仅允许读取静态资源。"))
             };
@@ -1236,7 +1453,9 @@ pub fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
         .register_uri_scheme_protocol("hydrogen-plugin", |context, request| {
             let state = context.app_handle().state::<AppState>();
             let result = if request.method() == "GET" {
-                state.panels.resource(request.uri().path())
+                state
+                    .panels
+                    .theme_resource(request.uri().path(), &state.host.themes)
             } else {
                 Err(ApiError::new("METHOD_DENIED", "仅允许读取静态资源。"))
             };
@@ -1261,6 +1480,7 @@ pub fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
             plugin_reload,
             panel_open,
             panel_call,
+            panel_theme,
             panel_close,
             ui_ready,
             ui_bootstrap,
@@ -1276,9 +1496,11 @@ pub fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 }));
             app.manage(AppState {
                 host: core.plugins.clone(),
+                safe_theme,
+                theme_announced: AtomicU64::new(0),
                 plugins: Mutex::new(plugins),
                 development,
-                plugin_mutation: tokio::sync::Mutex::new(()),
+                plugin_mutation: tokio::sync::RwLock::new(()),
                 plugin_candidates: Mutex::new(std::collections::BTreeMap::new()),
                 core: core.clone(),
                 panels: Panels::default(),
@@ -1292,14 +1514,40 @@ pub fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
                     rounded: false,
                 }),
                 dropped_files: Mutex::new(std::collections::BTreeMap::new()),
+                event_sequences: Mutex::default(),
                 legacy_imports: Mutex::new(std::collections::BTreeMap::new()),
             });
             let window =
                 tauri::WebviewWindowBuilder::from_config(app, &app.config().app.windows[0])?
                     .initialization_script(include_str!("frame-guard.js"))
                     .build()?;
-            *app.state::<AppState>().appearance.lock().unwrap() =
-                crate::window::apply(&window, &core)?;
+            crate::plugins::capabilities::desktop::attach(&core, window.clone());
+            let startup = app
+                .state::<AppState>()
+                .plugins
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|p| {
+                    p.manifest.runtime == "javascript"
+                        && p.manifest.activation.iter().any(|a| a == "startup")
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            let startup_host = core.plugins.clone();
+            let startup_settings = core.lease().settings.clone();
+            tauri::async_runtime::spawn(async move {
+                for plugin in startup {
+                    if startup_host.available(&startup_settings, &plugin.manifest.id) {
+                        let _ = startup_host.activate(plugin).await;
+                    }
+                }
+            });
+            *app.state::<AppState>().appearance.lock().unwrap() = crate::window::apply_preferences(
+                &window,
+                &core,
+                safe_theme || core.lease().settings.theme.material == "opaque",
+            )?;
             crate::window::attach_resize(&window, core.clone());
             let drop_app = app.handle().clone();
             window.on_window_event(move |event| {
@@ -1323,7 +1571,7 @@ pub fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
                         let (app, path) = (drop_app.clone(), path.clone());
                         tauri::async_runtime::spawn(async move {
                             let state = app.state::<AppState>();
-                            let _guard = state.plugin_mutation.lock().await;
+                            let _guard = state.plugin_mutation.write().await;
                             let error = state.core.import_modpack(path).await.err();
                             let _ = app.emit_to("main", "modpack-drop", error);
                         });
