@@ -287,6 +287,7 @@ async fn libraries(
     libraries: &[Value],
     job: &Job,
 ) -> Result<()> {
+    let mut files = BTreeMap::new();
     for lib in libraries {
         job.check()?;
         if lib["clientreq"] == false || client.service("minecraft.content", "allows", json!({"owner":lib,"architecture":if cfg!(target_arch="aarch64"){"arm64"}else{"x64"},"customResolution":false}))? != true { continue; }
@@ -321,6 +322,16 @@ async fn libraries(
             continue;
         }
         let size = a["size"].as_u64().filter(|n| *n > 0);
+        files.entry(relative).or_insert((url, hash, size));
+    }
+    job.phase("downloading", "正在下载并校验 Forge / NeoForge 依赖…");
+    job.begin_download(
+        files
+            .iter()
+            .map(|(path, (_, _, size))| (path.clone(), *size)),
+        true,
+    );
+    for (relative, (url, hash, size)) in files {
         net::ensure_game_file(
             client,
             root,
@@ -523,15 +534,17 @@ async fn processors(
     )?;
     fs::create_dir_all(log_path.parent().unwrap())?;
     let mut log = fs::File::create(log_path)?;
+    let processors: Vec<_> = processors
+        .iter()
+        .filter(|processor| {
+            processor["sides"]
+                .as_array()
+                .is_none_or(|sides| sides.iter().any(|side| side == "client"))
+        })
+        .collect();
     for (index, processor) in processors.iter().enumerate() {
-        if processor["sides"]
-            .as_array()
-            .is_some_and(|s| !s.iter().any(|s| s == "client"))
-        {
-            continue;
-        }
         job.phase(
-            "preparing",
+            "processing",
             format!(
                 "正在处理 Forge / NeoForge 安装步骤 {}/{}…",
                 index + 1,
@@ -553,6 +566,8 @@ async fn processors(
                 .to_string_lossy()
                 .replace('\\', "/");
             let mapping = &base["downloads"]["client_mappings"];
+            job.phase("downloading", "正在下载并校验映射文件…");
+            job.begin_download([(relative.clone(), mapping["size"].as_u64())], true);
             net::ensure_game_file(
                 client,
                 root,
@@ -664,6 +679,8 @@ pub async fn prepare(client: &Client, settings: &Settings, p: &Value, job: &Job)
         return Err(invalid());
     }
     let relative = format!("cache/installers/{kind}-{loader}.jar");
+    job.phase("downloading", "正在下载并校验 Forge / NeoForge 安装器…");
+    job.begin_download([(relative.clone(), None)], true);
     let installer = net::ensure(
         client,
         root,
@@ -721,6 +738,7 @@ pub async fn prepare(client: &Client, settings: &Settings, p: &Value, job: &Job)
     .await?;
     let metadata = merge(&p["prepared"]["metadata"], &version, game)?;
     job.check()?;
+    job.phase("verifying", "正在校验并补齐游戏文件…");
     service_task(
         "minecraft.preinstall",
         "prepare",

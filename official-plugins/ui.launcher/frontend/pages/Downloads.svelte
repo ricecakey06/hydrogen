@@ -21,7 +21,7 @@
 <div class="downloads-page">
   <div class="download-overall" in:entrance>
     <p class="download-summary" role="status" use:animateText={overall.text}>{overall.text}</p>
-    {#if jobs.length}<DownloadProgress percent={overall.percent} indeterminate={overall.indeterminate} overall />{/if}
+    {#if jobs.length}<DownloadProgress percent={overall.percent} indeterminate={overall.indeterminate} label={t("总体任务进度")} overall />{/if}
     {#if error || startError}<p class="issue" role="alert">{error || startError}</p>{/if}
   </div>
   <div class="scroll-pane task-list">
@@ -38,9 +38,9 @@
         </div>
         {#if name !== version}<p class="caption">{version}</p>{/if}
         <p class="download-status" use:animateText={task.phase}>{task.kind === 'modpackImport' ? t("导入整合包") + ' · ' : task.kind === 'modUpdate' ? t("模组更新") + ' · ' : task.kind === 'modDownload' ? t("模组下载") + ' · ' : ''}{item.status}</p>
-        <DownloadProgress percent={item.percent} indeterminate={item.indeterminate} />
-        <p class="caption">{item.detail}</p>
-        {#if item.files.length}<p class="caption">{t("正在处理的文件")}</p><div class="download-files">{#each item.files as file}<p>{file}</p>{/each}</div>{/if}
+        <DownloadProgress percent={item.percent} indeterminate={item.indeterminate} label={item.progressLabel} />
+        {#if item.detail}<p class="caption">{item.detail}</p>{/if}
+        {#if item.files.length}<p class="caption">{item.filesLabel}</p><div class="download-files">{#each item.files as file}<p>{file}</p>{/each}</div>{/if}
         {#if task.phase === 'failed'}<p class="issue" role="alert">{t(task.message)}</p>{/if}
       </section>
     {/each}

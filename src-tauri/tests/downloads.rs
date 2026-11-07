@@ -54,6 +54,71 @@ fn download_progress_tracks_partial_bytes_retry_resets_and_verified_files() {
 }
 
 #[test]
+fn processor_phase_clears_previous_transfers_and_a_new_plan_tracks_only_its_files() {
+    let tasks = Tasks::default();
+    let job = tasks.start("install", Some("instance")).unwrap();
+    job.phase("downloading", "libraries");
+    job.begin_download([("libraries/fastutil.jar".into(), None)], true);
+    job.file_started("libraries/fastutil.jar");
+    assert_eq!(
+        job.state
+            .lock()
+            .unwrap()
+            .download
+            .as_ref()
+            .unwrap()
+            .active_files,
+        ["libraries\\fastutil.jar"]
+    );
+    job.phase("processing", "processor step 1/2");
+    assert!(
+        job.state
+            .lock()
+            .unwrap()
+            .download
+            .as_ref()
+            .unwrap()
+            .active_files
+            .is_empty()
+    );
+
+    job.phase("verifying", "verify merged game files");
+    job.begin_download([("libraries/new-loader.jar".into(), None)], true);
+    job.file_started("libraries/fastutil.jar");
+    job.file_started("libraries/new-loader.jar");
+    let snapshot = job.state.lock().unwrap().download.clone().unwrap();
+    assert_eq!(snapshot.total_files, 1);
+    assert_eq!(snapshot.active_files, ["libraries\\new-loader.jar"]);
+    job.phase("committing", "save instance");
+    assert!(
+        job.state
+            .lock()
+            .unwrap()
+            .download
+            .as_ref()
+            .unwrap()
+            .active_files
+            .is_empty()
+    );
+}
+
+#[test]
+fn replayed_file_started_does_not_reactivate_a_verified_file() {
+    let tasks = Tasks::default();
+    let job = tasks.start("install", Some("instance")).unwrap();
+    job.begin_download(
+        [("completed.jar".into(), None), ("pending.jar".into(), None)],
+        true,
+    );
+    job.file_progress("completed.jar", 100, true);
+    job.file_started("completed.jar");
+    job.file_started("pending.jar");
+    let snapshot = job.state.lock().unwrap().download.clone().unwrap();
+    assert_eq!(snapshot.completed_files, 1);
+    assert_eq!(snapshot.active_files, ["pending.jar"]);
+}
+
+#[test]
 fn retry_replaces_the_failed_install_and_directory_switch_forgets_downloads() {
     let tasks = Tasks::default();
     let first = tasks.start("install", Some("instance")).unwrap();

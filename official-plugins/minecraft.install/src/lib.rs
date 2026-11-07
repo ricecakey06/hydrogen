@@ -63,7 +63,11 @@ async fn install(mut state: Value, mut instance: Value, job: Arc<Job>) -> Result
     )?;
     metadata["_hydrogenRunDirectory"] = game.clone();
     let base = metadata.clone();
-    job.phase("downloading", "正在下载并校验游戏文件…");
+    if existing {
+        job.phase("verifying", "正在校验并补齐游戏文件…");
+    } else {
+        job.phase("downloading", "正在下载并校验游戏文件…");
+    }
     let mut prepared=service_task("minecraft.preinstall","prepare",json!({"gameRoot":game_root,"settings":settings,"metadata":metadata,"architecture":if cfg!(target_arch="aarch64"){"arm64"}else{"x64"}}),&job).await?;
     if !existing && instance["components"].is_object() {
         let kind = instance["components"]["kind"].as_str().unwrap_or("fabric");
@@ -75,6 +79,7 @@ async fn install(mut state: Value, mut instance: Value, job: Arc<Job>) -> Result
                 json!({"id":kind,"params":{"gameVersion":version,"loaderVersion":instance["components"]["loader"]}}),
             )?;
             apply_loader_patch(&mut metadata, &patch)?;
+            job.phase("verifying", "正在校验并补齐游戏文件…");
             prepared=service_task("minecraft.preinstall","prepare",json!({"gameRoot":game_root,"settings":settings,"metadata":metadata,"architecture":if cfg!(target_arch="aarch64"){"arm64"}else{"x64"}}),&job).await?;
         } else {
             let service = if matches!(kind, "forge" | "neoforge") {

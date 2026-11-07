@@ -67,7 +67,18 @@ pub struct Job {
 }
 impl Job {
     pub fn phase(&self, phase: &str, message: impl Into<String>) {
+        let mut downloads = self.downloads.lock().unwrap();
         let mut state = self.state.lock().unwrap();
+        // Non-file phases must not retain filenames from a previous transfer.
+        if matches!(
+            phase,
+            "processing" | "extracting" | "committing" | "completed" | "failed" | "cancelled"
+        ) {
+            downloads.active.clear();
+            if let Some(progress) = &mut state.download {
+                progress.active_files.clear();
+            }
+        }
         state.phase = phase.into();
         state.message = message.into();
         state.sequence += 1;
@@ -124,7 +135,7 @@ impl Job {
     }
     pub fn file_started(&self, name: &str) {
         let mut downloads = self.downloads.lock().unwrap();
-        if downloads.files.contains_key(name) {
+        if downloads.files.get(name).is_some_and(|file| !file.done) {
             downloads.active.insert(name.into());
             self.report_download(&downloads, downloads.progress.total.is_none());
         }

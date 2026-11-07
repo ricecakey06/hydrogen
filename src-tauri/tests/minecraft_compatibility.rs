@@ -287,6 +287,8 @@ async fn cached_legacy_and_modern_forge_installers_publish_launchable_manifests(
         )
         .await
         .unwrap();
+        assert_eq!(job.state.lock().unwrap().phase, "verifying");
+        assert_eq!(job.state.lock().unwrap().message, "正在校验并补齐游戏文件…");
         client.service("minecraft.instances","publish",json!({"root":game,"name":name,"gameVersion":id,"base":metadata,"complete":prepared["metadata"],"loader":loader,"loaderKind":kind})).unwrap();
         let loaded = repository::load(&client, &game, &name).unwrap();
         assert_eq!(loaded.game_version, id);

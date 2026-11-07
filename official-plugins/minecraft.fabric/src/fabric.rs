@@ -84,6 +84,9 @@ pub async fn fabric(
         ("fabric", "Fabric", "https://meta.fabricmc.net/v2")
     };
     let message = format!("正在解析 {name}");
+    if installing {
+        job.phase("resolving", message.clone());
+    }
     job.begin_download([(message.clone(), None)], false);
     job.file_started(&message);
     let profile_id = format!("{kind}-loader-{}-{version}", components.loader);
@@ -236,6 +239,9 @@ pub async fn fabric(
             hash: text(&file["hashes"], "sha1")?.into(),
             size: file["size"].as_u64(),
         });
+    }
+    if installing {
+        job.phase("downloading", format!("正在下载并校验 {name} 依赖…"));
     }
     job.begin_download(
         downloads.iter().map(|file| (file.relative.clone(), None)),

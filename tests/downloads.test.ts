@@ -32,7 +32,7 @@ test('overall progress is weighted by bytes and becomes indeterminate while reso
   const large = task({ download: { completed: 90, total: 90, completedFiles: 0, totalFiles: 100, activeFiles: [] } });
   assert.equal(downloadSummary([small, large]).percent, 91);
   assert.equal(downloadSummary([small, large]).text, '总体进度 91% · 2 个任务正在下载');
-  assert.equal(downloadSummary([small, task({ phase: 'resolving', download: null })]).text, '2 个任务正在准备');
+  assert.equal(downloadSummary([small, task({ phase: 'resolving', download: null })]).text, '2 个任务正在进行');
 });
 test('item display uses original byte units, state labels and active filenames', () => {
   const item = downloadItem(task());
@@ -43,6 +43,48 @@ test('item display uses original byte units, state labels and active filenames',
   assert.equal(downloadItem(task({ download: { completed: 1024, total: null, completedFiles: 0, totalFiles: 1, activeFiles: [] } })).status, '正在获取资源索引');
   assert.deepEqual(downloadItem(task({ phase: 'failed' })).files, []);
   assert.equal(downloadBytes(1024 ** 3), '1.00 GB');
+});
+
+test('post-install verification labels the second pass and keeps its own file progress', () => {
+  const verifying = task({ kind: 'modpackImport', phase: 'verifying', message: '正在校验并补齐游戏文件…' });
+  const item = downloadItem(verifying);
+  assert.equal(item.status, '正在校验并补齐游戏文件 · 50%');
+  assert.equal(item.indeterminate, false);
+  assert.equal(item.percent, 50);
+  assert.equal(item.filesLabel, '正在校验的文件');
+  assert.equal(item.progressLabel, '文件校验进度');
+  assert.deepEqual(item.files, ['libraries\\large.jar']);
+  assert.equal(downloadSummary([verifying]).text, '总体校验进度 50% · 1 个任务正在校验文件');
+  const pending = { ...verifying, download: null };
+  assert.equal(downloadItem(pending).status, '正在校验并补齐游戏文件…');
+  assert.equal(downloadSummary([pending]).text, '1 个任务正在校验文件');
+  assert.equal(downloadSummary([verifying, task()]).text, '总体进度 50% · 2 个任务正在进行');
+});
+
+test('modpack resolution keeps the importer message before a file plan exists', () => {
+  const resolving = task({ kind: 'modpackImport', phase: 'resolving', download: null, message: '正在读取整合包清单…' });
+  assert.equal(downloadItem(resolving).status, resolving.message);
+  assert.equal(downloadItem(resolving).indeterminate, true);
+});
+
+test('loader processors and other non-file stages never display stale transfer details', () => {
+  for (const kind of ['install', 'modpackImport']) {
+    const processing = task({ kind, phase: 'processing', message: '正在处理 Forge / NeoForge 安装步骤 2/7…' });
+    const item = downloadItem(processing);
+    assert.equal(item.status, processing.message);
+    assert.equal(item.indeterminate, true);
+    assert.equal(item.percent, 0);
+    assert.equal(item.detail, '');
+    assert.deepEqual(item.files, []);
+    assert.equal(downloadSummary([processing]).indeterminate, true);
+    assert.equal(downloadSummary([processing]).text, '1 个任务正在进行');
+    assert.equal(downloadSummary([processing, task()]).text, '2 个任务正在进行');
+  }
+  for (const phase of ['preparing', 'extracting', 'staging', 'committing']) {
+    const item = downloadItem(task({ phase, message: '正在处理…' }));
+    assert.equal(item.detail, '');
+    assert.deepEqual(item.files, []);
+  }
 });
 
 test('launch preparation shows file progress when a Fabric library has no declared size', () => {

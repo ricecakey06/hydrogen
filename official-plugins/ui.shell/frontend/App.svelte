@@ -328,7 +328,7 @@
     </main>
     {#if modal}
       <div class="modal-overlay">
-        <button data-h-part="button" class="modal-scrim" tabindex="-1" disabled={modalPending} aria-label={t("关闭对话框")} onclick={() => closeModal()}></button>
+        <button class="modal-scrim" tabindex="-1" disabled={modalPending} aria-label={t("关闭对话框")} onclick={() => closeModal()}></button>
         <dialog data-h-scope="popup" open class="modal" aria-modal="true" aria-labelledby="modal-title" tabindex="-1" bind:this={modalElement} in:entrance>
           <h2 id="modal-title">{modal.title}</h2><p>{modal.description}</p>
           {#if modalError}<p class="issue" role="alert">{modalError}</p>{/if}
