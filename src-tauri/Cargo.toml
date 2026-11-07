@@ -1,6 +1,6 @@
 [package]
 name = "hydrogen-launcher"
-version = "0.2.12"
+version = "0.3.0"
 description = "Hydrogen desktop launcher for Minecraft: Java Edition"
 edition = "2024"
 license = "MIT"
