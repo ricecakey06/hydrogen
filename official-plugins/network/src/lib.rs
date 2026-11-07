@@ -10,6 +10,44 @@ struct Stream {
     pending: VecDeque<u8>,
     finished: bool,
 }
+impl Stream {
+    async fn read_frame(&mut self) -> Result<()> {
+        match self.response.chunk().await.map_err(failure)? {
+            Some(bytes) => {
+                if bytes.len() > 8 * 1024 * 1024 {
+                    return Err(ApiError::new("RESPONSE_LIMIT", "响应块超过限制。"));
+                }
+                self.pending.extend(bytes);
+            }
+            None => self.finished = true,
+        }
+        Ok(())
+    }
+    async fn chunk(&mut self) -> Result<Option<Vec<u8>>> {
+        const LIMIT: usize = 128 * 1024;
+        if self.pending.is_empty() && !self.finished {
+            self.read_frame().await?;
+        }
+        // Batch already-arriving frames across the plugin boundary, with bounded latency
+        // for trickling responses and bounded memory for large downloads.
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_millis(2);
+        while !self.finished && !self.pending.is_empty() && self.pending.len() < LIMIT {
+            match tokio::time::timeout_at(deadline, self.read_frame()).await {
+                Ok(result) => result?,
+                Err(_) => break,
+            }
+        }
+        if self.pending.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(
+                self.pending
+                    .drain(..self.pending.len().min(LIMIT))
+                    .collect(),
+            ))
+        }
+    }
+}
 enum Outcome {
     Headers(Stream),
     Chunk(Stream, Option<Vec<u8>>),
@@ -210,23 +248,8 @@ impl State {
                     .remove(id)
                     .ok_or_else(|| error("网络流不存在或正在读取。"))?;
                 let task = self.runtime.as_ref().unwrap().spawn(async move {
-                    if stream.pending.is_empty() {
-                        if stream.finished {
-                            return Ok(Outcome::Chunk(stream, None));
-                        }
-                        let Some(bytes) = stream.response.chunk().await.map_err(failure)? else {
-                            return Ok(Outcome::Chunk(stream, None));
-                        };
-                        if bytes.len() > 8 * 1024 * 1024 {
-                            return Err(ApiError::new("RESPONSE_LIMIT", "响应块超过限制。"));
-                        }
-                        stream.pending.extend(bytes);
-                    }
-                    let chunk: Vec<_> = stream
-                        .pending
-                        .drain(..stream.pending.len().min(128 * 1024))
-                        .collect();
-                    Ok(Outcome::Chunk(stream, Some(chunk)))
+                    let chunk = stream.chunk().await?;
+                    Ok(Outcome::Chunk(stream, chunk))
                 });
                 self.operations.insert(id.into(), task);
                 Ok(Value::Null)

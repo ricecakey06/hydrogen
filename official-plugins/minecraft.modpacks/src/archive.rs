@@ -479,6 +479,6 @@ pub async fn copy(
             return Err(invalid("整合包文件超过声明的大小。"));
         }
         output.write_all(&buffer[..count])?;
-        tokio::task::yield_now().await;
+        tokio::task::consume_budget().await;
     }
 }

@@ -141,22 +141,23 @@ impl Download {
                     continue;
                 }
             };
-            if !self.verified(&result, job).await? {
-                fs::remove_file(&result)?;
-                // SHA-512 and CurseForge fingerprints are verified here, after transfer.
-                let origin = service_task(
-                    "minecraft.download", "once",
-                    json!({"root":stage,"relative":self.path,"url":url,"hash":self.sha1,"size":self.size}),
-                    job,
-                ).await;
-                result = match origin {
-                    Ok(path) => serde_json::from_value(path)?,
-                    Err(error) => {
-                        last_error = error;
-                        continue;
-                    }
-                };
+            if self.verified(&result, job).await? {
+                return Ok(());
             }
+            fs::remove_file(&result)?;
+            // SHA-512 and CurseForge fingerprints are verified here, after transfer.
+            let origin = service_task(
+                "minecraft.download", "once",
+                json!({"root":stage,"relative":self.path,"url":url,"hash":self.sha1,"size":self.size}),
+                job,
+            ).await;
+            result = match origin {
+                Ok(path) => serde_json::from_value(path)?,
+                Err(error) => {
+                    last_error = error;
+                    continue;
+                }
+            };
             if self.verified(&result, job).await? {
                 return Ok(());
             }
@@ -477,19 +478,30 @@ pub async fn prepare(client: &Client, options: Prepare, job: &Job) -> Result<Val
     }
     job.phase("downloading", "正在下载并校验整合包文件…");
     job.begin_download(files.iter().map(|f| (f.path.clone(), Some(f.size))), true);
-    for file in &files {
-        // In a CurseForge pack, unresolved URLs have already been supplied locally or by overrides.
-        if overrides.contains_key(&file.path.to_lowercase())
-            || curseforge_pack && file.urls.is_empty()
-        {
-            job.file_progress(&file.path, file.size, true);
-        } else {
-            file.install(client, &stage, downloads_enabled, job).await?;
-        }
+    // Keep downloads inside this future so errors and cancellation drop all service handles.
+    let mut pending = stream::iter(&files)
+        .map(|file| async {
+            // Unresolved CurseForge URLs have already been supplied locally or by overrides.
+            if overrides.contains_key(&file.path.to_lowercase())
+                || curseforge_pack && file.urls.is_empty()
+            {
+                job.file_progress(&file.path, file.size, true);
+                Ok(())
+            } else {
+                file.install(client, &stage, downloads_enabled, job).await
+            }
+        })
+        .buffer_unordered(16);
+    while let Some(result) = pending.next().await {
+        job.check()?;
+        result?;
     }
+    drop(pending);
     job.phase("extracting", "正在解包整合包配置…");
     for file in overrides.values() {
         file.extract(&mut zip, &stage, job).await?;
+        // Small entries can finish synchronously; batch them without blocking cancellation.
+        tokio::task::consume_budget().await;
     }
     // Root artwork is outside the override layers and cannot overwrite pack content.
     for icon in pack.icons(&mut zip)? {
