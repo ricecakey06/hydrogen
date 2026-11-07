@@ -299,6 +299,7 @@ pub fn preview(
             jvm_arguments: value["overrides"]["jvmArguments"]
                 .as_str()
                 .map(String::from),
+            gc_mode: None,
         };
         Settings::defaults()?.effective(client, &overrides)?;
         items.push(Item {

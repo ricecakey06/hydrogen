@@ -15,6 +15,7 @@ use std::{
 pub struct Overrides {
     pub java: Option<String>,
     pub max_memory_mib: Option<u32>,
+    pub gc_mode: Option<String>,
     pub jvm_arguments: Option<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

@@ -1,7 +1,8 @@
 import { t } from './i18n.ts';
 import { invoke } from '@tauri-apps/api/core';
 
-export interface Overrides { java: string | null; maxMemoryMib: number | null; jvmArguments: string | null }
+export type GcMode = 'preferZgc' | 'preferGenerationalZgc' | 'g1' | 'tunedG1';
+export interface Overrides { java: string | null; maxMemoryMib: number | null; gcMode?: GcMode | null; jvmArguments: string | null }
 export interface Components { kind?: string; loader: string; fabricApi: string | null }
 export interface InstanceInfo { id: string; name: string; gameVersion: string; isInstalled: boolean; overrides: Overrides; components: Components | null; directoryName: string | null; loaderName: string }
 export function instanceLoaderLabel(instance: InstanceInfo) {
@@ -10,7 +11,7 @@ export function instanceLoaderLabel(instance: InstanceInfo) {
   const name = instance.loaderName || ({ fabric: 'Fabric', forge: 'Forge', neoforge: 'NeoForge', quilt: 'Quilt' } as Record<string,string>)[components.kind ?? 'fabric'] || components.kind;
   return [name, components.loader].filter(Boolean).join(' ');
 }
-export interface Settings { theme: { id: string; mode: 'light' | 'dark' | 'system'; material: 'auto' | 'opaque' }; locale: string; gameDirectory: string | null; isolateGameDirectory: boolean | null; java: string | null; maxMemoryMib: number; windowMode: string; windowWidth: number; windowHeight: number; afterLaunch: string; jvmArguments: string; downloadSource: string; useModMirror: boolean; offlineEnabled: boolean; offlinePlayerName: string; accountMode: string; microsoftClientId: string; modules: Record<string, boolean> }
+export interface Settings { theme: { id: string; mode: 'light' | 'dark' | 'system'; material: 'auto' | 'opaque' }; locale: string; gameDirectory: string | null; isolateGameDirectory: boolean | null; java: string | null; maxMemoryMib: number; gcMode: GcMode; windowMode: string; windowWidth: number; windowHeight: number; afterLaunch: string; jvmArguments: string; downloadSource: string; useModMirror: boolean; offlineEnabled: boolean; offlinePlayerName: string; accountMode: string; microsoftClientId: string; modules: Record<string, boolean> }
 export interface JavaRuntime { path: string; version: string; major: number; architecture: string }
 export interface DownloadProgress { completed: number; total: number | null; completedFiles: number; totalFiles: number; activeFiles: string[] }
 export interface CrashCause { id: string; title: string; summary: string; suggestions: string[]; evidence: string[] }

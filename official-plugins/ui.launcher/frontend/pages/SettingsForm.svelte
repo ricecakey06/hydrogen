@@ -5,7 +5,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { t, i18n } from '../../../ui.shell/frontend/lib/i18n';
-  import { action, errorMessage, instanceLoaderLabel, taskActive, type InstanceInfo, type Snapshot, type Settings, type JavaRuntime } from '../../../ui.shell/frontend/lib/api';
+  import { action, errorMessage, instanceLoaderLabel, taskActive, type InstanceInfo, type Snapshot, type Settings, type JavaRuntime, type GcMode } from '../../../ui.shell/frontend/lib/api';
   import Icon from '../../../ui.shell/frontend/components/Icon.svelte';
   import InstanceIcon from '../components/InstanceIcon.svelte';
   import PluginPanel from '../../../ui.shell/frontend/components/PluginPanel.svelte';
@@ -35,6 +35,17 @@
   let java = $state('');
   let memory = $state(4096);
   let inheritMemory = $state(true);
+  let gcMode = $state<GcMode | ''>('g1');
+  const gcOptions = $derived.by(() => {
+    $i18n;
+    return [
+      { value: 'preferZgc', label: t("尽量使用ZGC") },
+      { value: 'preferGenerationalZgc', label: t("尽量使用分代ZGC") },
+      { value: 'g1', label: t("标准G1GC") },
+      { value: 'tunedG1', label: t("调优G1GC") },
+    ];
+  });
+  const globalGcLabel = $derived(gcOptions.find(option => option.value === (snapshot?.settings.gcMode ?? 'g1'))?.label ?? '');
   let inheritJvm = $state(true);
   let isolation = $state('auto');
   let windowMode = $state('default');
@@ -55,6 +66,7 @@
     instanceName = instance?.name ?? '';
     java = instance ? instance.overrides.java ?? '' : settings.java ?? '';
     memory = instance?.overrides.maxMemoryMib ?? settings.maxMemoryMib; inheritMemory = instance?.overrides.maxMemoryMib == null;
+    gcMode = instance ? instance.overrides.gcMode ?? '' : settings.gcMode ?? 'g1';
     jvm = instance?.overrides.jvmArguments ?? settings.jvmArguments; inheritJvm = instance?.overrides.jvmArguments == null;
     isolation = settings.isolateGameDirectory == null ? 'auto' : settings.isolateGameDirectory ? 'isolated' : 'shared';
     source = settings.downloadSource; windowMode = settings.windowMode; windowWidth = settings.windowWidth; windowHeight = settings.windowHeight; afterLaunch = settings.afterLaunch;
@@ -90,8 +102,8 @@
   async function save() {
     if (!snapshot) return; busy = true; error = ''; message = '';
     try {
-      if (instance) { await action('saveOverrides', { id: instance.id, overrides: { java: java || null, maxMemoryMib: inheritMemory ? null : Number(memory), jvmArguments: inheritJvm ? null : jvm } }); }
-      else { const settings: Settings = { ...snapshot.settings, locale: languageAvailable ? locale : snapshot.settings.locale, isolateGameDirectory: isolation === 'auto' ? null : isolation === 'isolated', java: java || null, maxMemoryMib: Number(memory), jvmArguments: jvm, downloadSource: source, useModMirror, windowMode, windowWidth: Number(windowWidth), windowHeight: Number(windowHeight), afterLaunch }; await action('saveSettings', { settings }); }
+      if (instance) { await action('saveOverrides', { id: instance.id, overrides: { java: java || null, maxMemoryMib: inheritMemory ? null : Number(memory), gcMode: gcMode || null, jvmArguments: inheritJvm ? null : jvm } }); }
+      else { const settings: Settings = { ...snapshot.settings, locale: languageAvailable ? locale : snapshot.settings.locale, isolateGameDirectory: isolation === 'auto' ? null : isolation === 'isolated', java: java || null, maxMemoryMib: Number(memory), gcMode: gcMode || 'g1', jvmArguments: jvm, downloadSource: source, useModMirror, windowMode, windowWidth: Number(windowWidth), windowHeight: Number(windowHeight), afterLaunch }; await action('saveSettings', { settings }); }
       await onchange(); message = t("设置已保存");
     } catch (e) { error = errorMessage(e); } finally { busy = false; }
   }
@@ -130,6 +142,7 @@
         <p class="caption">{t("这些设置只应用于当前实例。")}</p>
         <div class="instance-field">{@render javaEditor()}</div>
         <div class="instance-field">{@render memoryEditor()}</div>
+        <div class="instance-field">{@render gcEditor()}</div>
         {@render jvmEditor()}
       </section>
       <section data-h-part="card" class="instance-panel" aria-labelledby={`${formId}-management-heading`}>
@@ -190,6 +203,7 @@
       <p id="mod-mirror-note" class="caption">{t("默认启用 MCIM，镜像失败后自动回退源站；关闭后模组查询与下载统一使用源站。保存后用于新的请求。")}</p>
       {@render javaEditor()}
       {@render memoryEditor()}
+      {@render gcEditor()}
       <label class="section-label" for="game-window">{t("游戏窗口")}</label>
       <select data-h-part="input-shell" id="game-window" bind:value={windowMode}><option value="default">{t("游戏默认")}</option><option value="custom">{t("自定义尺寸")}</option><option value="fullscreen">{t("全屏")}</option></select>
       {#if windowMode === 'custom'}<div class="window-size" in:entrance><input data-h-part="input-shell" type="number" aria-label={t("窗口宽度")} min="320" max="7680" bind:value={windowWidth} /><span>×</span><input data-h-part="input-shell" type="number" aria-label={t("窗口高度")} min="240" max="4320" bind:value={windowHeight} /></div>{/if}
@@ -268,6 +282,17 @@
     <input data-h-part="input-shell" type="number" min="512" max={snapshot?.memory.totalMib ?? 65536} step="256" bind:value={memory} disabled={!!instance && inheritMemory} aria-label={t("最大内存（MB）")} /><span>MB</span>
   </div>
   <p class="caption">{t("按游戏版本与模组数量分配内存，并为系统保留足够空间。")}</p>
+{/snippet}
+
+<!-- Memory settings reuse section-label/input-shell/caption tokens: choice first, explanation second; Save remains the primary action. -->
+{#snippet gcEditor()}
+  <label class="section-label" for={`${formId}-gc-mode`}>{t("内存设置")}</label>
+  <select data-h-part="input-shell" id={`${formId}-gc-mode`} bind:value={gcMode} aria-describedby={`${formId}-gc-note`}>
+    {#if instance}<option value="">{t("跟随全局设置（{0}）", globalGcLabel)}</option>{/if}
+    {#each gcOptions as option}<option value={option.value}>{option.label}</option>{/each}
+  </select>
+  <p class="caption" id={`${formId}-gc-note`}>{t("ZGC 不可用时回退到标准 G1GC；分代 ZGC 不可用时先尝试普通 ZGC。调优 G1GC 调整停顿目标与回收参数。")}</p>
+  <p class="caption">{t("高级 JVM 参数或版本配置已指定垃圾收集器时，以其设置为准。")}</p>
 {/snippet}
 
 {#snippet jvmEditor()}

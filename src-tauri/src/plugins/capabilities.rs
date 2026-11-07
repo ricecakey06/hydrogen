@@ -192,7 +192,7 @@ pub mod desktop {
                     let patch = params.as_object().ok_or_else(|| ApiError::new("INVALID_PARAMS","设置补丁必须为对象。"))?;
                     let mut settings = serde_json::to_value(core.store.lock().unwrap().settings.clone())?;
                     for (key,value) in patch {
-                        if !["locale","java","maxMemoryMib","windowMode","windowWidth","windowHeight","afterLaunch","jvmArguments","downloadSource"].contains(&key.as_str()) {
+                        if !["locale","java","maxMemoryMib","gcMode","windowMode","windowWidth","windowHeight","afterLaunch","jvmArguments","downloadSource"].contains(&key.as_str()) {
                             return Err(ApiError::new("SETTING_SCOPE","此设置字段不能由插件更改。"));
                         }
                         settings[key] = value.clone();

@@ -1,3 +1,4 @@
+mod gc;
 mod prepare;
 mod services;
 use hydrogen_plugin_services::{
@@ -146,6 +147,18 @@ async fn launch(p: Value, job: Arc<Job>) -> Result<Value> {
         java.version,
         java.architecture,
         settings.max_memory_mib
+    ));
+    let collectors: Vec<_> = args
+        .iter()
+        .filter(|arg| {
+            arg.starts_with("-XX:") && (arg.ends_with("GC") || arg.ends_with("ZGenerational"))
+        })
+        .cloned()
+        .collect();
+    log.line(&format!(
+        "Memory mode: {} · {}",
+        settings.gc_mode,
+        collectors.join(" ")
     ));
     if PluginHost.available(&network_settings, "i18n")
         && let Err(error) = invoke(

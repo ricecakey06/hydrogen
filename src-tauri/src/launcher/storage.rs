@@ -20,6 +20,8 @@ pub struct Settings {
     pub isolate_game_directory: Option<bool>,
     pub java: Option<String>,
     pub max_memory_mib: u32,
+    #[serde(default = "default_gc_mode")]
+    pub gc_mode: String,
     pub window_mode: String,
     pub window_width: u32,
     pub window_height: u32,
@@ -41,6 +43,9 @@ fn default_locale() -> String {
 fn default_mod_mirror() -> bool {
     true
 }
+fn default_gc_mode() -> String {
+    "g1".into()
+}
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -50,6 +55,7 @@ impl Default for Settings {
             isolate_game_directory: None,
             java: None,
             max_memory_mib: 2048,
+            gc_mode: default_gc_mode(),
             window_mode: "default".into(),
             window_width: 854,
             window_height: 480,
@@ -87,6 +93,7 @@ pub fn memory_advice(client: &super::net::Client) -> Result<MemoryAdvice> {
 pub struct Overrides {
     pub java: Option<String>,
     pub max_memory_mib: Option<u32>,
+    pub gc_mode: Option<String>,
     pub jvm_arguments: Option<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

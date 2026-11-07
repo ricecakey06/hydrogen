@@ -86,6 +86,7 @@ fn persistent_settings_instances_and_protected_configs() {
     );
     let mut settings = store.settings.clone();
     settings.max_memory_mib = 3072;
+    settings.gc_mode = "preferGenerationalZgc".into();
     store.save(settings.clone()).unwrap();
     let mut instance = store.create("1.21.1", "测试实例", None).unwrap();
     assert!(
@@ -98,6 +99,8 @@ fn persistent_settings_instances_and_protected_configs() {
         "unfinished installation is resumed"
     );
     instance.info.is_installed = true;
+    assert!(instance.overrides.gc_mode.is_none());
+    instance.overrides.gc_mode = Some("tunedG1".into());
     store.write_instance(&instance).unwrap();
     store.select(&instance.info.id).unwrap();
     store.rename(&instance.info.id, "新的名称").unwrap();
@@ -105,6 +108,29 @@ fn persistent_settings_instances_and_protected_configs() {
     drop(store);
     let store = Store::open(dir.path().to_path_buf()).unwrap();
     assert_eq!(store.settings, settings);
+    let saved = store.instance(&instance.info.id).unwrap();
+    assert_eq!(saved.overrides.gc_mode.as_deref(), Some("tunedG1"));
+    let client = hydrogen::launcher::net::client(&store.plugins, &store.settings).unwrap();
+    assert_eq!(
+        store
+            .settings
+            .effective(&client, &saved.overrides)
+            .unwrap()
+            .gc_mode,
+        "tunedG1"
+    );
+    let mut inherited = saved;
+    inherited.overrides.gc_mode = None;
+    store.write_instance(&inherited).unwrap();
+    let saved = store.instance(&instance.info.id).unwrap();
+    assert_eq!(
+        store
+            .settings
+            .effective(&client, &saved.overrides)
+            .unwrap()
+            .gc_mode,
+        "preferGenerationalZgc"
+    );
     assert_eq!(store.selected, Some(instance.info.id));
     drop(store);
     let incompatible = br#"{"schemaVersion":99,"format":"hydrogen-tauri","settings":{}}"#;

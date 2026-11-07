@@ -52,6 +52,8 @@ pub struct Settings {
     pub isolate_game_directory: Option<bool>,
     pub java: Option<String>,
     pub max_memory_mib: u32,
+    #[serde(default = "default_gc_mode")]
+    pub gc_mode: String,
     pub window_mode: String,
     pub window_width: u32,
     pub window_height: u32,
@@ -72,6 +74,9 @@ fn default_locale() -> String {
 }
 fn default_mod_mirror() -> bool {
     true
+}
+fn default_gc_mode() -> String {
+    "g1".into()
 }
 fn allows(
     client: &Client,
@@ -274,7 +279,15 @@ pub fn arguments(
     if let Some(logging) = &game.logging {
         args.push(logging.clone());
     }
-    args.extend(jvm_arguments(client, &settings.jvm_arguments)?);
+    let custom = jvm_arguments(client, &settings.jvm_arguments)?;
+    let existing: Vec<_> = args.iter().chain(&custom).cloned().collect();
+    args.extend(super::gc::arguments(
+        &settings.gc_mode,
+        java,
+        &existing,
+        |flags| super::gc::probe(java, directory, flags),
+    )?);
+    args.extend(custom);
     add_stack_shadow_pages(&game.metadata, &mut args);
     add_lwjgl_unsafe_agent(client, game, java, directory, &mut args)?;
     let main = hydrogen_plugin_services::text(&game.metadata, "mainClass")?;

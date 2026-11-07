@@ -18,7 +18,7 @@ export interface PluginContext {
     list(): Promise<InstanceInfo[]>; select(id: string): Promise<void>; repair(id: string): Promise<TaskHandle>; launch(id: string): Promise<TaskHandle>;
     create(params: { version: string; name: string; components?: { kind: string; loader: string; fabricApi?: string | null } }): Promise<TaskHandle>;
     rename(params: { id: string; name: string }): Promise<void>;
-    configure(params: { id: string; overrides: { java: string | null; maxMemoryMib: number | null; jvmArguments: string | null } }): Promise<void>;
+    configure(params: { id: string; overrides: { java: string | null; maxMemoryMib: number | null; gcMode?: 'preferZgc' | 'preferGenerationalZgc' | 'g1' | 'tunedG1' | null; jvmArguments: string | null } }): Promise<void>;
     delete(params: { id: string; confirmation: string }): Promise<void>;
   };
   accounts: {

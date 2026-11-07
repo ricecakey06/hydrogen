@@ -14,6 +14,8 @@ pub struct Settings {
     pub isolate_game_directory: Option<bool>,
     pub java: Option<String>,
     pub max_memory_mib: u32,
+    #[serde(default = "default_gc_mode")]
+    pub gc_mode: String,
     pub window_mode: String,
     pub window_width: u32,
     pub window_height: u32,
@@ -35,6 +37,9 @@ fn default_locale() -> String {
 fn default_mod_mirror() -> bool {
     true
 }
+fn default_gc_mode() -> String {
+    "g1".into()
+}
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -44,6 +49,7 @@ impl Default for Settings {
             isolate_game_directory: None,
             java: None,
             max_memory_mib: memory_advice().recommended_mib,
+            gc_mode: default_gc_mode(),
             window_mode: "default".into(),
             window_width: 854,
             window_height: 480,
@@ -127,6 +133,7 @@ pub fn memory_advice() -> MemoryAdvice {
 pub struct Overrides {
     pub java: Option<String>,
     pub max_memory_mib: Option<u32>,
+    pub gc_mode: Option<String>,
     pub jvm_arguments: Option<String>,
 }
 pub fn jvm_arguments(text: &str) -> Result<Vec<String>> {
@@ -265,6 +272,8 @@ impl Settings {
             return Err(ApiError::new("INVALID_LOCALE", "语言标识无效。"));
         }
         if !(512..=memory_advice().total_mib).contains(&self.max_memory_mib)
+            || !["preferZgc", "preferGenerationalZgc", "g1", "tunedG1"]
+                .contains(&self.gc_mode.as_str())
             || !["default", "custom", "fullscreen"].contains(&self.window_mode.as_str())
             || !(320..=16384).contains(&self.window_width)
             || !(240..=16384).contains(&self.window_height)
@@ -320,6 +329,9 @@ impl Settings {
         if let Some(memory) = overrides.max_memory_mib {
             settings.max_memory_mib = memory;
         }
+        if let Some(mode) = &overrides.gc_mode {
+            settings.gc_mode = mode.clone();
+        }
         if let Some(jvm) = &overrides.jvm_arguments {
             settings.jvm_arguments = jvm.clone();
         }
@@ -340,4 +352,38 @@ fn provider_id(value: &str) -> bool {
                     .chain(b.bytes())
                     .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'.' || c == b'-')
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gc_settings_default_inherit_override_and_validate() {
+        let mut old = serde_json::to_value(Settings::default()).unwrap();
+        old.as_object_mut().unwrap().remove("gcMode");
+        let mut settings: Settings = serde_json::from_value(old).unwrap();
+        assert_eq!(settings.gc_mode, "g1");
+        let inherited: Overrides = serde_json::from_value(serde_json::json!({})).unwrap();
+        for mode in ["preferZgc", "preferGenerationalZgc", "g1", "tunedG1"] {
+            settings.gc_mode = mode.into();
+            assert_eq!(settings.effective(&inherited).unwrap().gc_mode, mode);
+            let overrides: Overrides =
+                serde_json::from_value(serde_json::json!({"gcMode": "tunedG1"})).unwrap();
+            let effective = settings.effective(&overrides).unwrap();
+            assert_eq!(effective.gc_mode, "tunedG1");
+            assert_eq!(effective.max_memory_mib, settings.max_memory_mib);
+            assert_eq!(
+                serde_json::to_value(&overrides).unwrap()["gcMode"],
+                "tunedG1"
+            );
+        }
+        let overrides = Overrides {
+            gc_mode: Some("unknown".into()),
+            ..Default::default()
+        };
+        assert!(settings.effective(&overrides).is_err());
+        settings.gc_mode = "unknown".into();
+        assert!(settings.validate().is_err());
+    }
 }

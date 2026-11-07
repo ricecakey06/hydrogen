@@ -16,6 +16,8 @@ pub struct Settings {
     pub isolate_game_directory: Option<bool>,
     pub java: Option<String>,
     pub max_memory_mib: u32,
+    #[serde(default = "default_gc_mode")]
+    pub gc_mode: String,
     pub window_mode: String,
     pub window_width: u32,
     pub window_height: u32,
@@ -36,6 +38,9 @@ fn default_locale() -> String {
 }
 fn default_mod_mirror() -> bool {
     true
+}
+fn default_gc_mode() -> String {
+    "g1".into()
 }
 impl Settings {
     pub fn defaults() -> Result<Self> {
