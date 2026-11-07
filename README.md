@@ -35,41 +35,15 @@ Hydrogen 使用插件提供界面、账号和游戏管理等功能。当前版�
 | --- | --- | --- |
 | Windows x64 | 便携式 `Launcher.exe` | Microsoft Edge WebView2 Runtime 110 或更新版本；启动游戏仍需兼容的 Java |
 
-启动器使用系统 WebView2，不会自动安装 WebView2 或下载 Java。目前尚未提供 macOS 和 Linux 桌面发行版。
-
 ## 下载与使用
 
 从 [Releases](https://github.com/ricecakey06/hydrogen/releases) 下载 `Launcher.exe`，放入具有写入权限的独立目录后运行。发布页的 `SHA256SUMS.txt` 用于核对文件摘要；未发布的构建可从 [Actions](https://github.com/ricecakey06/hydrogen/actions/workflows/ci.yml) 下载 `Hydrogen-win-x64` 产物。
 
-Release 由维护者手动发布。CI 负责构建、测试并保存 Windows 产物；发布时由维护者选择提交和版本标签、填写说明并上传 `Launcher.exe` 与 `SHA256SUMS.txt`。
-
-### 首次启动
+### 启动
 
 1. 在启动器设置中检查 Java 路径、内存和游戏目录，也可直接选择已有的 `.minecraft`。
 2. 在“档案管理”添加微软账号或离线玩家，并选择要使用的档案。离线档案需要启用默认预装的“离线启动”插件。
 3. 在“版本管理”添加游戏版本，选择原版、Fabric、Forge 或 NeoForge 组件并安装；完成后选择实例启动。
-
-新安装列表支持全部 Minecraft 官方正式版（含 1.18 以下）、快照与预发布版，并提供版本搜索和类型筛选。Fabric、Forge、NeoForge 和 Fabric API 可选择具体版本；加载器互斥，Fabric API 仅适用于 Fabric，安装失败或取消后可重试。下载与准备任务在离开页面后继续执行；启动已有游戏时会校验并补齐缺失资源和依赖。
-
-实例的模组页面显示本地元数据和已缓存信息。点击或拖动框选模组，通过底部操作栏批量启停、删除或清除选择；支持导入 `.jar` / `.jar.disabled` 文件及编辑本地中文名。游戏运行或相关任务执行时限制文件修改。
-
-将 Modrinth 的 `.mrpack` 或 CurseForge 的 `.zip` 拖入启动器即可安装为独立实例，进度在“下载管理”查看。“版本设置 → 导出整合包”支持按目录或子目录勾选内容，然后选择格式和保存目录。“资源下载 → 模组下载”可切换 Modrinth 和 CurseForge。
-
-在「启动器设置 → 常规」可以切换简体中文和 English，保存后也会设置 Minecraft 的默认语言。已有的游戏语言选择会保留。自定义语言包可参考[英文语言包](official-plugins/i18n/assets/locales/en-US.json)，将 `<locale>.json` 放入启动器数据目录的 `language-packs` 文件夹，重新打开启动器后即可选择。
-
-游戏异常退出时，“崩溃分析”插件可提供可能原因、日志依据和建议，并导出包含日志快照的 ZIP。常见令牌及本机路径会被脱敏，分享前仍请检查模组自行输出的私人内容。分析结果依赖日志，不保证覆盖所有崩溃原因。
-
-### 数据与账号
-
-默认在 EXE 旁的 `HydrogenTauriData/` 保存设置、账号凭据、插件、缓存和日志，在 `.minecraft/` 保存游戏文件。`versions/<版本名>/` 使用标准版本目录，库和资源分别共享 `libraries/` 与 `assets/`。全局设置可选择自动识别、共享游戏目录或每个版本独立目录；删除版本会保留共享存档与资源。
-
-档案列表保存在 `profiles.json`。微软登录使用系统浏览器授权，登录凭据按档案存储，并由当前 Windows 用户的 DPAPI 加密。
-
-旧版数据通过设置中的“导入旧版数据”预览后复制，原目录保持不变；账号凭据及旧版 C# DLL 插件不会导入。也可通过启动参数选择独立数据目录：
-
-```powershell
-.\Launcher.exe --data-dir D:\HydrogenData
-```
 
 ## 插件管理
 
