@@ -92,6 +92,26 @@ fn jvm_arguments(client: &Client, text: &str) -> Result<Vec<String>> {
         json!({"text":text}),
     )?)?)
 }
+fn add_stack_shadow_pages(metadata: &Value, args: &mut Vec<String>) {
+    let version = metadata["clientVersion"]
+        .as_str()
+        .or_else(|| metadata["id"].as_str())
+        .unwrap_or_default();
+    let mut parts = version.split(['.', '-']);
+    let version = parts
+        .next()
+        .and_then(|s| s.parse::<u32>().ok())
+        .zip(parts.next().and_then(|s| s.parse::<u32>().ok()));
+    // Minecraft 26.3+ needs more shadow stack pages during resource reloads.
+    // https://github.com/MultiMC/Launcher/issues/5779
+    if version.is_some_and(|version| version >= (26, 3))
+        && !args
+            .iter()
+            .any(|arg| arg.starts_with("-XX:StackShadowPages="))
+    {
+        args.push("-XX:StackShadowPages=32".into());
+    }
+}
 fn add_lwjgl_unsafe_agent(
     client: &Client,
     game: &Prepared,
@@ -255,6 +275,7 @@ pub fn arguments(
         args.push(logging.clone());
     }
     args.extend(jvm_arguments(client, &settings.jvm_arguments)?);
+    add_stack_shadow_pages(&game.metadata, &mut args);
     add_lwjgl_unsafe_agent(client, game, java, directory, &mut args)?;
     let main = hydrogen_plugin_services::text(&game.metadata, "mainClass")?;
     if !regex::Regex::new(r"^[a-zA-Z_$][a-zA-Z0-9_.$]+$")

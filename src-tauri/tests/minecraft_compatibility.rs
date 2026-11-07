@@ -46,6 +46,75 @@ fn launch_args(
 }
 
 #[tokio::test]
+async fn stack_shadow_pages_follows_the_game_version_and_preserves_existing_jvm_options() {
+    let temp = tempfile::tempdir().unwrap();
+    let host = common::plugin_host(&temp.path().join("data"));
+    let mut settings = Settings::default();
+    let client = net::client(&host, &settings).unwrap();
+    let root = temp.path().join("game");
+    let mut prepared = json!({"metadata":{},"classpath":[root.join("client.jar")],
+        "natives":[],"assets":root.join("assets"),"libraries":root.join("libraries"),"asset_index":"test"});
+    let option = "-XX:StackShadowPages=32";
+    for (version, name, expected) in [
+        ("1.21.11", "26.3", false),
+        ("26.2", "26.3", false),
+        ("26.2.9", "26.3", false),
+        ("26.3", "Custom modpack", true),
+        ("26.3-snapshot-1", "Custom modpack", true),
+        ("26.3-snapshot-10", "Custom modpack", true),
+        ("26.3-pre-1", "Custom modpack", true),
+        ("26.3-rc-2", "Custom modpack", true),
+        ("26.3.1", "Custom modpack", true),
+        ("26.10", "Custom modpack", true),
+        ("27.1", "Custom modpack", true),
+        ("25w45a", "26.3", false),
+        ("unknown", "Custom modpack", false),
+    ] {
+        prepared["metadata"] = client
+            .service(
+                "minecraft.instances",
+                "normalize",
+                json!({"metadata":base(name, true),"gameVersion":version}),
+            )
+            .unwrap();
+        let args = launch_args(&client, &prepared, &settings, &root, 25);
+        let main = args
+            .iter()
+            .position(|arg| arg == "net.minecraft.client.main.Main")
+            .unwrap();
+        assert_eq!(
+            args[..main].iter().filter(|arg| *arg == option).count(),
+            usize::from(expected),
+            "{version}"
+        );
+    }
+    prepared["metadata"] = base("26.3", true);
+    assert!(launch_args(&client, &prepared, &settings, &root, 25).contains(&option.into()));
+    prepared["metadata"]["arguments"]["jvm"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!(option));
+    let args = launch_args(&client, &prepared, &settings, &root, 25);
+    assert_eq!(args.iter().filter(|arg| *arg == option).count(), 1);
+    prepared["metadata"]["arguments"]["jvm"]
+        .as_array_mut()
+        .unwrap()
+        .pop();
+    for value in [32, 40] {
+        let custom = format!("-XX:StackShadowPages={value}");
+        settings.jvm_arguments = format!("-Dcustom=true {custom}");
+        let args = launch_args(&client, &prepared, &settings, &root, 25);
+        assert_eq!(
+            args.iter()
+                .filter(|arg| arg.starts_with("-XX:StackShadowPages="))
+                .collect::<Vec<_>>(),
+            [&custom]
+        );
+        assert!(args.contains(&"-Dcustom=true".into()));
+    }
+}
+
+#[tokio::test]
 async fn lwjgl_unsafe_agent_is_added_only_to_compatible_launches() {
     let temp = tempfile::tempdir().unwrap();
     let host = common::plugin_host(&temp.path().join("data"));

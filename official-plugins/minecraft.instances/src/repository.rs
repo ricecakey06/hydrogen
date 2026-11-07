@@ -258,6 +258,7 @@ fn jar_version(path: &Path) -> Option<String> {
         .map(String::from)
 }
 pub fn normalize(metadata: &mut Value, game_version: &str) -> Result<()> {
+    metadata["clientVersion"] = game_version.into();
     if !metadata["arguments"].is_object() {
         metadata["arguments"] = json!({});
     }
