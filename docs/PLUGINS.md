@@ -1,12 +1,12 @@
-# Hydrogen 插件开发
+# Hydrogen Plugin Development
 
-JavaScript 插件使用 **schemaVersion 3 / API 2**，不支持旧版 JS 协议。原生插件继续使用 ABI v1，清单支持 schema 2 或 3。外置插件仍以 .hplugin 分发，无需重新编译启动器。
+JavaScript plugins use **schemaVersion 3 / API 2**. The previous JavaScript protocol is unsupported. Native plugins use ABI v1 and accept manifest schema 2 or 3. External plugins are distributed as `.hplugin` packages and can be installed without rebuilding the launcher.
 
-**完整外观主题**使用声明式 CSS、图片和字体，见 [主题作者指南](THEMES.md) 与 [公共变量/部位目录](../THEME-CONTRACT.md)。独立主题无需 `ui.host`，宿主不执行它的 JavaScript 入口。支持从 0.2.7 起。
+**Complete appearance themes** use declarative CSS, images, and fonts. See the [theme authoring guide](THEMES.md) and [public variables and parts](../THEME-CONTRACT.md). Standalone themes do not require `ui.host`, and the host does not execute their JavaScript entry point. The theme contract declares support starting with version 0.2.7.
 
-## 零构建起步
+## Getting started without a build toolchain
 
-使用发行版附带的 hydrogen-dev.exe 即可创建、校验、测试和打包插件，不需要 Rust、Node.js 或 npm。
+Use the `hydrogen-dev.exe` CLI supplied with the release to create, validate, test, and package plugins. Rust, Node.js, and npm are not required.
 
 ~~~powershell
 hydrogen-dev.exe plugin init ./instance-tools
@@ -17,13 +17,13 @@ hydrogen-dev.exe plugin pack ./instance-tools --out ./instance-tools.hplugin
 hydrogen-dev.exe api export --out ./sdk
 ~~~
 
-plugin test 默认只校验激活及清理；指定 --command 和可选 --params 执行命令。CLI 使用隔离的实例列表，不连接用户账号和游戏目录。真实修复、安装、任务与界面在 Launcher.exe --data-dir 测试目录 --dev-plugin 插件目录 中验证。
+By default, `plugin test` validates activation and cleanup only. Add `--command` and optionally `--params` to execute a command. The CLI uses an isolated instance list and does not connect to user accounts or game directories. Validate real repairs, installations, tasks, and UI behavior with `Launcher.exe --data-dir ./test-data --dev-plugin ./plugin-dir`.
 
-模板包含 plugin.json、main.js、launcher.d.ts 和完整 ui 目录。修改 JS / HTML 后在插件详情执行“校验并重载”。增加权限、域名或程序范围需要重新安装确认；重载不会扩权。
+The template contains `plugin.json`, `main.js`, `launcher.d.ts`, and a complete `ui/` directory. After editing JavaScript or HTML, choose **Verify and reload** in the plugin details. Adding permissions, domains, or process scopes requires reinstalling and confirming the new permissions; reloading cannot expand permissions.
 
-## 业务脚本与面板
+## Business logic and panels
 
-参考 [实例工具清单](../examples/instance-tools/plugin.json)、[业务脚本](../examples/instance-tools/main.js) 和 [完整类型声明](../plugin-sdk/launcher.d.ts)。
+See the [instance tools manifest](../examples/instance-tools/plugin.json), [business script](../examples/instance-tools/main.js), and [complete type declarations](../plugin-sdk/launcher.d.ts).
 
 ~~~js
 export function activate(ctx) {
@@ -33,9 +33,9 @@ export function activate(ctx) {
 }
 ~~~
 
-命令接收 JSON 参数，可返回 JSON 或 Promise。修复、创建、启动、资源安装、Java 扫描等返回宿主任务句柄。ctx.tasks.get(id) 查询进度，ctx.tasks.cancel(id) 取消；任务权限只授予创建插件及该运行时代次。提交阶段不可取消。
+Commands accept JSON parameters and may return JSON or a Promise. Repair, creation, launch, resource installation, and Java scanning return host task handles. Use `ctx.tasks.get(id)` to read progress and `ctx.tasks.cancel(id)` to cancel. Task access belongs to the creating plugin and runtime generation. The commit phase cannot be canceled.
 
-面板运行在隔离 iframe，没有 Tauri 调用权限。复制 [bridge.js](../plugin-sdk/bridge.js) 到 ui/ 并导入：
+Panels run in isolated iframes without access to Tauri commands. Copy [bridge.js](../plugin-sdk/bridge.js) into `ui/` and import it:
 
 ~~~js
 import { bridge } from './bridge.js';
@@ -48,55 +48,55 @@ await bridge.tasks.cancel(task.id);
 subscription.dispose();
 ~~~
 
-桥接提供结构化错误、上下文/语言/主题通知、进度查询和取消。bridge.resize(height) 可调整视图高度，宿主限制在 120–900 px。命令只在所属插件执行。关闭、导航或停止所属插件会撤销该视图；最多同时挂载 16 个独立会话。面板资源不允许远程脚本、网络连接或表单导航。
+The bridge provides structured errors, context/language/theme notifications, progress queries, and cancellation. `bridge.resize(height)` requests a height between 120 and 900 px. Commands execute only in the panel's owning plugin. Closing or navigating the view, or stopping its plugin, revokes the view session. At most 16 independent sessions may be mounted concurrently. Panel resources cannot load remote scripts, make network connections, or navigate through forms.
 
-## 清单与 UI 扩展
+## Manifests and UI contributions
 
 ~~~json
 {
   "schemaVersion": 3,
   "apiVersion": 2,
   "id": "example.tools",
-  "name": "实例工具",
+  "name": "Instance tools",
   "version": "1.0.0",
   "runtime": "javascript",
   "entry": "main.js",
   "permissions": ["instances.repair", "tasks.read", "tasks.cancel", "ui.contribute", "ui.panel"],
   "contributes": {
-    "commands": [{ "id": "repair", "title": "修复此实例" }],
-    "panels": [{ "id": "overview", "title": "实例工具", "entry": "ui/index.html" }],
+    "commands": [{ "id": "repair", "title": "Repair this instance" }],
+    "panels": [{ "id": "overview", "title": "Instance tools", "entry": "ui/index.html" }],
     "views": [{ "id": "tools", "location": "sidebar.main", "panel": "overview" }],
     "menus": [{ "id": "repair-instance", "location": "instance.toolbar", "command": "repair", "when": "instanceSelected" }]
   }
 }
 ~~~
 
-支持 sidebar.main、sidebar.footer、home.widgets、home.actions、settings.sections、instance.tabs、instance.toolbar、instance.contextMenu、mods.toolbar、mods.contextMenu、resources.actions、profiles.actions、downloads.taskActions、titlebar.actions、status.items、commands.palette。首页卡片直接挂载面板，实例标签页必须引用面板，其他自定义区点击后挂载。实例和模组列表提供右键菜单，也可用 Shift+F10 打开；简单动作由宿主按钮渲染。group、order 和完整贡献 ID 决定稳定顺序。when 只支持 instanceSelected、modsSelected、taskActive。
+Supported locations are `sidebar.main`, `sidebar.footer`, `home.widgets`, `home.actions`, `settings.sections`, `instance.tabs`, `instance.toolbar`, `instance.contextMenu`, `mods.toolbar`, `mods.contextMenu`, `resources.actions`, `profiles.actions`, `downloads.taskActions`, `titlebar.actions`, `status.items`, and `commands.palette`. Home widgets mount panels directly; instance tabs must reference a panel. Other custom areas mount a panel when opened. Instance and mod lists provide context menus, also accessible with `Shift+F10`; the host renders simple actions as buttons. `group`, `order`, and the complete contribution ID determine stable ordering. `when` supports only `instanceSelected`, `modsSelected`, and `taskActive`.
 
-宿主传递 instanceId、selectedModIds / selectedMods、taskId、taskActive 等页面上下文。ctx.ui.update(id, { title, badge, enabled, visible }) 更新自己的入口；状态按插件摘要和代次清理。
+The host passes page context such as `instanceId`, `selectedModIds` / `selectedMods`, `taskId`, and `taskActive`. Use `ctx.ui.update(id, { title, badge, enabled, visible })` to update your own contribution. State is scoped to the plugin digest and runtime generation and is cleared with them.
 
-commands.palette 暂保留清单位置标识，主侧栏隐藏此入口；插件命令仍可在插件详情中执行。
+`commands.palette` is currently a reserved manifest location and is hidden in the main sidebar. Plugin commands can still be executed from plugin details.
 
-## 权限和范围
+## Permissions and scopes
 
-| 能力 | 权限 | 资源限制 |
+| Capability | Permissions | Resource boundaries |
 | --- | --- | --- |
-| 实例列表、编辑、修复、启动 | instances.read / write / repair / launch | 宿主验证实例 ID、占用、目录和配置 |
-| 档案、Java | accounts.read / write、java.read / scan | 不返回宿主账号凭据；扫描返回任务 |
-| 资源、模组、整合包 | resources.read / install、mods.read / write、modpacks.read / write | 安装和导入使用宿主事务 |
-| 设置 | settings.read / write | 字段补丁；不能修改插件启用、游戏目录、账号身份 |
-| 私有存储与文件 | storage、files | 仅 plugin-data/插件ID/；拒绝路径越界和链接 |
-| 网络 | http | scopes.http 的确切主机名，重定向也须在范围内 |
-| 进程 | process | scopes.process 的确切绝对程序路径；任务支持取消 |
-| 任务、事件、Hook、日志 | tasks.read / cancel、events、hooks、log | 任务按代次归属；Hook 在读取阶段执行 |
-| UI | ui.contribute、ui.panel | 限定清单引用和固定位置 |
-| 服务 | services.call | 声明依赖与版本；原生低层方法须经业务适配 |
+| List, edit, repair, and launch instances | `instances.read`, `instances.write`, `instances.repair`, `instances.launch` | The host validates instance IDs, busy state, directories, and configuration |
+| Profiles and Java | `accounts.read`, `accounts.write`, `java.read`, `java.scan` | Host account credentials are not exposed; scanning returns a task |
+| Resources, mods, and modpacks | `resources.read`, `resources.install`, `mods.read`, `mods.write`, `modpacks.read`, `modpacks.write` | Installation and import use host transactions |
+| Settings | `settings.read`, `settings.write` | Field patches only; cannot change plugin enablement, game directories, or account identity |
+| Private storage and files | `storage`, `files` | Restricted to `plugin-data/<pluginId>/`; path escapes and links are rejected |
+| Network | `http` | Exact hostnames in `scopes.http`; redirects must stay within the scope |
+| Processes | `process` | Exact absolute executable paths in `scopes.process`; tasks support cancellation |
+| Tasks, events, hooks, and logging | `tasks.read`, `tasks.cancel`, `events`, `hooks`, `log` | Tasks belong to a runtime generation; hooks execute in a read-only phase |
+| UI | `ui.contribute`, `ui.panel` | Restricted to manifest references and supported locations |
+| Services | `services.call` | Dependencies and versions must be declared; native low-level methods require business adapters |
 
-HTTP 请求返回有限的 UTF-8 文本；大文件使用 http.download，单次最大 1 GiB。文件 API 不提供任意系统目录访问。进程标准输入输出不通过消息桥接传输，任务报告完成或失败。
+HTTP requests return bounded UTF-8 text. Use `http.download` for large files; each download is limited to 1 GiB. The file API does not provide arbitrary system directory access. Process standard input/output is not transported through the message bridge; the task reports completion or failure.
 
-## 服务及提供者
+## Services and providers
 
-服务注册必须与 provides 的服务 ID 和全部方法对应：
+Service registration must match the service ID and complete method list declared in `provides`:
 
 ~~~js
 ctx.services.register('example.tools', {
@@ -108,35 +108,35 @@ const value = await ctx.services.call({
 });
 ~~~
 
-dependencies 声明插件版本，request.version 声明服务版本，两者独立检查。调用链拒绝循环及超过 32 层的调用，跨服务继续检查最初 JS 调用者的权限；业务适配使用双方网络与程序授权范围的交集，并拦截回调正在等待当前 JS 的原生提供者。ctx.services.list() 列出方法及开放状态。[官方方法覆盖清单](../plugin-sdk/services.json) 逐项记录直接开放、业务适配或原生限定的方法。
+`dependencies` declares plugin version constraints; `request.version` declares the service version constraint. These are checked independently. Call chains reject cycles and depths exceeding 32. Cross-service calls continue to enforce the original JavaScript caller's permissions. Business adapters intersect the caller's and provider's network/process scopes and reject callbacks into a native provider already waiting on the current JavaScript runtime. `ctx.services.list()` lists methods and availability. The [official method coverage catalog](../plugin-sdk/services.json) identifies each method as directly available, adapted, or native-only.
 
-在 contributes.providers 中声明 { id, kind, title, service, version: "1.0.0" }，完整提供者 ID 为 pluginId:providerId：
+Declare providers in `contributes.providers` as `{ id, kind, title, service, version: "1.0.0" }`. The complete provider ID is `pluginId:providerId`:
 
-| kind | JS 服务方法及结果 | 业务入口 |
+| `kind` | JavaScript service methods and results | Business entry points |
 | --- | --- | --- |
-| resourceSource | filters、search、versions、dependencies；downloadPlan 返回 {filename,url,sha1,size}[] | 资源来源选择、版本详情、安装 |
-| accountProvider | view 返回账号视图；signIn / session 返回会话；signOut 清理 | 添加档案、选择、登录与启动 |
-| loaderProvider | versions 返回 {version,stable?}[]；installPlan 返回 mainClass、libraries、arguments 补丁 | 创建实例中的加载器选择和安装 |
-| downloadSource | resolve({url}) 返回 {url} | 下载源设置与实际传输 |
+| `resourceSource` | `filters`, `search`, `versions`, `dependencies`; `downloadPlan` returns `{filename,url,sha1,size}[]` | Resource source selection, version details, installation |
+| `accountProvider` | `view` returns an account view; `signIn` / `session` return a session; `signOut` clears state | Add a profile, select an account, sign in, launch |
+| `loaderProvider` | `versions` returns `{version,stable?}[]`; `installPlan` returns `mainClass`, `libraries`, and `arguments` patches | Loader selection and installation when creating an instance |
+| `downloadSource` | `resolve({url})` returns `{url}` | Download source settings and file transfer |
 
-资源结果沿用资源页面 DTO（search 返回 hits / total_hits，versions 返回版本列表）；下载计划最多 128 个 JAR，提供 SHA-1 和大小，域名来自提供者 scopes.http。加载器 libraries 最多 256 项，必须含 downloads.artifact 的 URL、SHA-1 和大小；路径校验、下载和发布由宿主已有安装服务处理。低层内容服务的受支持下载域名约束仍适用。下载源返回 HTTPS 地址且域名必须在 scopes.http 内。
+Resource results use the resource page DTOs: `search` returns `hits` / `total_hits`, and `versions` returns the version list. A download plan may contain at most 128 JARs and must provide SHA-1 and size declarations; its domains come from the provider's `scopes.http`. Loader `libraries` may contain at most 256 entries, each including URL, SHA-1, and size in `downloads.artifact`. Existing host installation services handle path validation, download, and publication. Supported download-domain restrictions also apply to low-level content services. Download source providers must return HTTPS URLs whose domains are within `scopes.http`.
 
-自定义账号提供者只收到 profileId 和 restore 等公共参数，不接收宿主账号目录、设置或其他提供者令牌。view 至少返回 status、playerName、detail、skin；session 使用账号服务 Session 契约。用户自行选择自定义提供者，宿主不会把微软凭据传给它。
+Custom account providers receive only public parameters such as `profileId` and `restore`, not host account directories, settings, or another provider's tokens. `view` must at least return `status`, `playerName`, `detail`, and `skin`; `session` follows the account service `Session` contract. Users explicitly select a custom provider. The host does not forward Microsoft credentials to it.
 
-## 生命周期、事件与限制
+## Lifecycle, events, and limits
 
-activate(ctx) 只注册处理函数和读取数据。需要提交后执行的工作放入 ctx.onReady(handler)；候选验证失败时旧运行时继续可用。ctx.onDispose(handler) 提供有期限的清理，失败不阻止其他资源回收。
+`activate(ctx)` registers handlers and reads data only. Put work that must run after a successful commit in `ctx.onReady(handler)`; failed candidate validation leaves the previous runtime available. `ctx.onDispose(handler)` provides time-bounded cleanup; a cleanup failure does not prevent other resources from being released.
 
-命令、视图和服务按需激活；activation: ["startup"] 显式启用启动激活。事件支持 instance.changed、task.updated、game.exited；实例变化和任务变化根据宿主快照去重后投递，覆盖主界面及插件操作。订阅和 UI 状态随代次清理，繁忙时事件队列有界。订阅者错误记录在插件详情的运行诊断中，最多保留最近 32 条，不影响其他订阅者。
+Commands, views, and services activate on demand. `activation: ["startup"]` explicitly enables startup activation. Supported events are `instance.changed`, `task.updated`, and `game.exited`. Instance/task changes are deduplicated against host snapshots and cover both main UI and plugin operations. Subscriptions and UI state are cleared with their runtime generation; event queues are bounded when a plugin is busy. Subscriber errors are recorded in plugin runtime diagnostics, keeping at most the latest 32 entries without affecting other subscribers.
 
-Hook 支持 beforeLaunch 和 beforeInstall，按插件 ID 排序，可返回 null、空对象或 {deny:"原因"}。beforeLaunch 还可返回 {patch:{maxMemoryMib:4096,jvmArguments:"-XX:+UseG1GC"}}，仅影响本次启动，不保存实例配置。补丁复用宿主的物理内存与 JVM 参数校验；不同插件设置同一字段为不同值时返回 HOOK_CONFLICT。beforeInstall 只允许放行或拒绝。Hook 内只允许读取；未知返回字段、错误或超时终止流程。
+Hooks support `beforeLaunch` and `beforeInstall`, execute in plugin ID order, and may return `null`, an empty object, or `{deny:"reason"}`. `beforeLaunch` may also return `{patch:{maxMemoryMib:4096,jvmArguments:"-XX:+UseG1GC"}}`; the patch affects only that launch and does not save instance configuration. Patches use existing physical-memory and JVM-argument validation. Different plugins setting the same field to different values produce `HOOK_CONFLICT`. `beforeInstall` may only allow or deny the operation. Hooks are read-only. Unknown result fields, errors, or timeouts terminate the operation.
 
-每个 QuickJS Runtime 上限 8 MiB，总预算 64 MiB；单个 JS 执行片段 100 ms，命令总时长 30 s，宿主请求超时 25 s，激活限时 3 s。等待 I/O 的 Promise 让出调度。每个插件最多 8 个在途宿主请求，消息上限 256 KiB；业务长任务不占用 JS 命令的等待时限。同步原生请求在工作线程执行。原生 ABI 无法强制中断同步系统调用，在途租约结束前禁止替换相关运行时。
+Each QuickJS runtime is limited to 8 MiB, with a total budget of 64 MiB. A single JavaScript execution slice is limited to 100 ms; command execution to 30 s; host requests to 25 s; and activation to 3 s. Promises waiting for I/O yield to the scheduler. Each plugin may have at most 8 in-flight host requests, with a 256 KiB message limit. Long-running business tasks do not consume the JavaScript command's wait budget. Synchronous native requests run on worker threads. The native ABI cannot forcibly interrupt synchronous system calls, and related runtimes cannot be replaced until in-flight leases finish.
 
-## 原生开发
+## Native development and repository builds
 
-[原生 ABI v1 SDK](../plugin-sdk/native/src/lib.rs) 和 [C 头文件](../plugin-sdk/native/hydrogen_plugin.h) 保持不变。原生清单声明 native.code 与 bin/ 下的平台库。原生代码拥有启动器进程权限；普通 JS 插件无需使用它。
+The [native ABI v1 SDK](../plugin-sdk/native/src/lib.rs) and [C header](../plugin-sdk/native/hydrogen_plugin.h) retain their existing ABI. Native manifests declare `native.code` and a platform library under `bin/`. Native code has the launcher's process privileges; ordinary JavaScript plugins do not need native code.
 
-仓库开发者用 scripts/native.ps1 check 检查桌面 Rust，scripts/native.ps1 test 运行测试，npm run check 检查 Svelte，npm run build 构建前端。新增原生发行插件仍需登记 official-plugins/distribution.json；外置 JS 插件直接安装 .hplugin。
+Repository developers use `scripts/native.ps1 check` to check desktop Rust, `scripts/native.ps1 test` to run tests, `npm run check` to check Svelte, and `npm run build` to build the frontend. New native distribution plugins must be registered in `official-plugins/distribution.json`. External JavaScript plugins can be installed directly as `.hplugin` packages.
 
-包不执行安装脚本，不解析 TS/JSX，不安装 npm 依赖。TypeScript 和 Svelte 作者自行构建为包内 JavaScript / 静态资源后打包。清单最多 64 KiB，包与解压总量各最多 256 MiB，最多 4096 个文件，所有 JS 合计最多 2 MiB；禁止绝对路径、路径穿越、链接和文件名大小写冲突。
+Packages do not execute installation scripts, parse TS/JSX, or install npm dependencies. TypeScript and Svelte authors must compile to package-local JavaScript and static assets before packaging. A manifest is limited to 64 KiB; both the archive and extracted package to 256 MiB; file count to 4096; and all JavaScript sources combined to 2 MiB. Absolute paths, path traversal, links, and filename case collisions are rejected.
