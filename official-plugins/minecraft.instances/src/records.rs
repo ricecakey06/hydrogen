@@ -6,6 +6,7 @@ use hydrogen_plugin_services::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
+    collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
     sync::Arc,
@@ -86,6 +87,10 @@ impl Store {
         let (versions, issues) = repository::scan(&self.game_root)?;
         Ok((Arc::new(versions), issues))
     }
+    fn order_path(&self) -> Result<PathBuf> {
+        let key = repository::instance_id(&self.game_root, "");
+        within(&self.root, &format!("instance-order/{key}.json"))
+    }
     fn discovered_instance(&self, version: &repository::Version) -> Instance {
         Instance {
             schema_version: 1,
@@ -151,7 +156,43 @@ impl Store {
             }
         }
         result.sort_by_key(|i| i.info.name.to_lowercase());
+        if let Ok(ids) = self
+            .order_path()
+            .and_then(|path| read_json::<Vec<String>>(&path))
+        {
+            let ranks: BTreeMap<_, _> = ids
+                .iter()
+                .enumerate()
+                .map(|(index, id)| (id, index))
+                .collect();
+            result.sort_by_key(|instance| {
+                ranks.get(&instance.info.id).copied().unwrap_or(usize::MAX)
+            });
+        }
         Ok((result, issues))
+    }
+    pub fn move_instance(&self, id: &str, target: &str, after: bool) -> Result<()> {
+        self.writable()?;
+        let mut ids: Vec<_> = self
+            .instances()?
+            .into_iter()
+            .map(|instance| instance.info.id)
+            .collect();
+        let index = ids
+            .iter()
+            .position(|entry| entry == id)
+            .ok_or_else(|| ApiError::new("UNKNOWN_INSTANCE", "实例不存在。"))?;
+        let anchor = ids
+            .iter()
+            .position(|entry| entry == target)
+            .ok_or_else(|| ApiError::new("UNKNOWN_INSTANCE", "实例不存在。"))?;
+        let destination = anchor + usize::from(after) - usize::from(index < anchor);
+        if index != anchor && index != destination {
+            let id = ids.remove(index);
+            ids.insert(destination, id);
+            write_json(&self.order_path()?, &ids)?;
+        }
+        Ok(())
     }
     pub fn instance(&self, id: &str) -> Result<Instance> {
         if !id_valid(id) {

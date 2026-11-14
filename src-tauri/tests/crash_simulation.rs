@@ -21,6 +21,65 @@ async fn simulated_game_processes_exercise_the_complete_launch_and_report_pipeli
     let settings: Settings = serde_json::from_value(config["settings"].clone()).unwrap();
     let host = common::plugin_host(&root);
     let client = net::client(&host, &settings).unwrap();
+    let normal = fixture["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["scenario"] == "normal")
+        .unwrap();
+    let instance = json!({"id":normal["id"],"name":normal["name"],"directoryName":normal["name"],"gameVersion":"1.20.1","isInstalled":true,"overrides":{},"components":null});
+    let start = |task: String| {
+        let client = &client;
+        let params = json!({"root":root,"gameRoot":game,"settings":settings,"instance":instance,"java":[],"taskId":task,"minimized":false});
+        let markers = root.join(format!(
+            "instances/{}/processes",
+            normal["id"].as_str().unwrap()
+        ));
+        async move {
+            let mut overlapping = false;
+            let result = net::task_observed(
+                client,
+                "minecraft.launch",
+                "launch",
+                params,
+                None,
+                |progress| {
+                    if progress["phase"] == "running" {
+                        let own = markers.join(format!("{task}.json"));
+                        assert!(own.is_file());
+                        overlapping |= fs::read_dir(&markers)?
+                            .filter_map(Result::ok)
+                            .filter(|entry| {
+                                entry
+                                    .path()
+                                    .extension()
+                                    .is_some_and(|extension| extension == "json")
+                            })
+                            .count()
+                            == 2;
+                    }
+                    Ok(())
+                },
+            )
+            .await
+            .unwrap();
+            assert_eq!(result["exitCode"], 0);
+            assert!(!markers.join(format!("{task}.json")).exists());
+            overlapping
+        }
+    };
+    let (first, second) = tokio::time::timeout(Duration::from_secs(20), async {
+        tokio::join!(
+            start(uuid::Uuid::new_v4().simple().to_string()),
+            start(uuid::Uuid::new_v4().simple().to_string())
+        )
+    })
+    .await
+    .expect("concurrent launches timed out");
+    assert!(
+        first && second,
+        "both JVMs must be running at the same time"
+    );
     let mut results = Vec::new();
     for case in fixture["cases"].as_array().unwrap() {
         let scenario = case["scenario"].as_str().unwrap();
@@ -41,7 +100,7 @@ async fn simulated_game_processes_exercise_the_complete_launch_and_report_pipeli
         assert!(
             !root
                 .join(format!(
-                    "instances/{}/process.json",
+                    "instances/{}/processes/{task}.json",
                     case["id"].as_str().unwrap()
                 ))
                 .exists()

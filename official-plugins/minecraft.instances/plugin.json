@@ -34,6 +34,7 @@
         "publish",
         "instanceId",
         "records.list",
+        "records.move",
         "records.get",
         "records.write",
         "records.create",

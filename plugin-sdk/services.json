@@ -3,6 +3,19 @@
     "provider": "account.manager",
     "service": "account.manager",
     "version": "1.0.0",
+    "method": "profiles.move",
+    "access": "nativeOnly",
+    "api": null,
+    "maxMessageBytes": 262144,
+    "requestTimeoutMs": 25000,
+    "constraints": "由桌面启动器提交移动项和目标项的 ID，以及插入位置。",
+    "reason": "用于桌面启动器列表排序。",
+    "verification": "src-tauri/tests/service_plugins.rs"
+  },
+  {
+    "provider": "account.manager",
+    "service": "account.manager",
+    "version": "1.0.0",
     "method": "view",
     "access": "adapted",
     "api": "accounts.list",
@@ -920,6 +933,19 @@
     "requestTimeoutMs": 25000,
     "constraints": "宿主根据实例 ID 派生目录；任务仅对创建者及代次开放；网络域名、程序由清单 scopes 授权。",
     "reason": "包含内部句柄、宿主路径、凭据、平台 UI 或低层协议；由业务 API 编排，不直接开放给 JS。",
+    "verification": "src-tauri/tests/service_plugins.rs"
+  },
+  {
+    "provider": "minecraft.instances",
+    "service": "minecraft.instances",
+    "version": "1.0.0",
+    "method": "records.move",
+    "access": "nativeOnly",
+    "api": null,
+    "maxMessageBytes": 262144,
+    "requestTimeoutMs": 25000,
+    "constraints": "由桌面启动器提交移动项和目标项的 ID，以及插入位置。",
+    "reason": "用于桌面启动器列表排序。",
     "verification": "src-tauri/tests/service_plugins.rs"
   },
   {

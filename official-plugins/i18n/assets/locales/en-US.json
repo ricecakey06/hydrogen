@@ -3,6 +3,12 @@
   "name": "English",
   "minecraftLanguage": "en_us",
   "messages": {
+    "正在检查启动档案，请稍候。": "Checking the launch profile…",
+    "再启动一个游戏": "Launch another game",
+    "{0} 个游戏窗口正在运行": "Running game windows: {0}",
+    "请等待登录或启动账号检查完成后更改档案。": "Wait for sign-in or the launch account check before editing profiles.",
+    "请等待登录或启动账号检查完成后切换档案。": "Wait for sign-in or the launch account check before switching profiles.",
+    "请等待登录或启动账号检查完成后退出账号。": "Wait for sign-in or the launch account check before signing out.",
     "内存设置": "Memory settings",
     "尽量使用ZGC": "Prefer ZGC",
     "尽量使用分代ZGC": "Prefer generational ZGC",

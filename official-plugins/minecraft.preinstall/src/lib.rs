@@ -38,6 +38,7 @@ impl State {
                 let root = PathBuf::from(text(p, "gameRoot")?);
                 let metadata = p["metadata"].clone();
                 let architecture = text(p, "architecture")?.to_owned();
+                let quick = p["quick"] == true;
                 let client = Client::new(&PluginHost, &settings)?;
                 let job = Arc::new(Job::default());
                 self.jobs.begin(job.clone(), async move {
@@ -49,6 +50,7 @@ impl State {
                             &settings,
                             metadata,
                             &architecture,
+                            quick,
                             job,
                         )
                         .await?,

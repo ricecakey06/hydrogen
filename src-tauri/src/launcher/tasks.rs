@@ -258,6 +258,7 @@ impl Tasks {
         if tasks.values().any(|j| {
             let state = j.state.lock().unwrap();
             state.active()
+                && !(kind == "launch" && state.kind == "launch" && state.phase == "running")
                 && (instance.is_some() && state.instance_id.as_deref() == instance
                     || instance.is_none() && state.kind == kind)
         }) {
@@ -355,6 +356,14 @@ impl Tasks {
         self.list()
             .iter()
             .any(|j| j.active() && instance.is_none_or(|id| j.instance_id.as_deref() == Some(id)))
+    }
+    pub fn account_busy(&self) -> bool {
+        self.list().iter().any(|task| {
+            task.active()
+                && (task.kind == "login"
+                    || task.kind == "launch"
+                        && matches!(task.phase.as_str(), "queued" | "checking"))
+        })
     }
     pub fn forget_downloads(&self, instance: Option<&str>) {
         self.0.lock().unwrap().retain(|_, job| {

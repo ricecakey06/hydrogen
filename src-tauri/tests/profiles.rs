@@ -33,6 +33,11 @@ async fn offline_profiles_persist_and_supply_the_selected_game_identity() {
         .unwrap();
     assert_eq!(alex_session.name, "Alex");
     assert_ne!(steve_session.uuid, alex_session.uuid);
+    core.profile_change(
+        "profiles.move",
+        json!({"id":alex["id"],"target":"legacy-offline","after":false}),
+    )
+    .unwrap();
     drop(core);
     let reopened = Launcher::open(Some(root.clone())).unwrap();
     let view = reopened.view().unwrap();
@@ -42,6 +47,7 @@ async fn offline_profiles_persist_and_supply_the_selected_game_identity() {
     );
     assert_eq!(view.account.player_name.as_deref(), Some("Alex"));
     assert_eq!(view.account.profiles.len(), 3); // Includes the migrated Player identity.
+    assert_eq!(view.account.profiles[0].id, alex["id"]);
     let restored = reopened
         .accounts
         .session(&reopened.client, &root, &view.settings)
@@ -118,7 +124,7 @@ async fn deleting_current_and_last_profiles_does_not_recreate_them_or_touch_save
 }
 
 #[tokio::test]
-async fn profile_changes_are_blocked_during_login_and_game_tasks() {
+async fn profile_changes_are_blocked_during_login_and_launch_account_checks() {
     let test = tempfile::tempdir().unwrap();
     let core = Launcher::open(Some(test.path().join("data"))).unwrap();
     for kind in ["login", "launch"] {
@@ -145,7 +151,15 @@ async fn profile_changes_are_blocked_during_login_and_game_tasks() {
         );
         job.finish(Ok(()));
     }
+    let game = core.tasks.start("launch", Some("same-instance")).unwrap();
+    game.phase("running", "running");
     core.select_profile("legacy-offline").unwrap();
+    let next = core.tasks.start("launch", Some("same-instance")).unwrap();
+    assert!(core.tasks.start("install", Some("same-instance")).is_err());
+    assert!(core.tasks.start("launch", Some("same-instance")).is_err());
+    next.phase("running", "running");
+    game.phase("exited", "exited");
+    assert!(core.tasks.start("install", Some("same-instance")).is_err());
 }
 
 #[tokio::test]

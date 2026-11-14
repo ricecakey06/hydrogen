@@ -31,6 +31,8 @@ async fn launch(p: Value, job: Arc<Job>) -> Result<Value> {
     let game_root = p["gameRoot"].clone();
     let instance = &p["instance"];
     let id = text(instance, "id")?;
+    let task_id = text(&p, "taskId")?;
+    let marker = storage::within(&root, &format!("instances/{id}/processes/{task_id}.json"))?;
     if instance["isInstalled"] != true {
         return Err(ApiError::new("NOT_INSTALLED", "请先完成实例安装。"));
     }
@@ -118,8 +120,8 @@ async fn launch(p: Value, job: Arc<Job>) -> Result<Value> {
             format!("需要 Java {required}，32 位 Java 的内存不能超过 1400 MB。"),
         ));
     }
-    job.phase("preparing", "正在准备并校验游戏文件…");
-    let prepared:Prepared=serde_json::from_value(service_task("minecraft.preinstall","prepare",json!({"gameRoot":game_root,"settings":raw,"metadata":metadata,"architecture":java.architecture}),&job).await?)?;
+    job.phase("preparing", "正在准备游戏文件…");
+    let prepared:Prepared=serde_json::from_value(service_task("minecraft.preinstall","prepare",json!({"gameRoot":game_root,"settings":raw,"metadata":metadata,"architecture":java.architecture,"quick":true}),&job).await?)?;
     std::fs::create_dir_all(&game)?;
     let natives: PathBuf = serde_json::from_value(invoke(
         "minecraft.instances",
@@ -127,12 +129,22 @@ async fn launch(p: Value, job: Arc<Job>) -> Result<Value> {
         "nativeDirectory",
         json!({"root":game_root,"name":name,"architecture":java.architecture}),
     )?)?;
-    prepare::extract(&prepared, &natives)?;
+    let mut natives = NativeDirectory {
+        path: storage::within(&natives, task_id)?,
+        in_use: false,
+    };
+    prepare::extract(&prepared, &natives.path)?;
     let args = prepare::arguments(
-        &client, &prepared, &java, &session, &settings, &game, &natives,
+        &client,
+        &prepared,
+        &java,
+        &session,
+        &settings,
+        &game,
+        &natives.path,
     )?;
     job.check()?;
-    let log_path = storage::within(&root, &format!("logs/game-{}.log", text(&p, "taskId")?))?;
+    let log_path = storage::within(&root, &format!("logs/game-{task_id}.log"))?;
     let mut log = Log::create(
         &log_path,
         if session.offline {
@@ -177,7 +189,6 @@ async fn launch(p: Value, job: Arc<Job>) -> Result<Value> {
         .unwrap_or_default()
         .as_millis() as u64;
     let child = Child::spawn(&java.path, args, &game)?;
-    let marker = storage::within(&root, &format!("instances/{id}/process.json"))?;
     let saved = child
         .stamp
         .ok_or_else(|| ApiError::new("PROCESS_IDENTITY", "无法确认游戏进程身份。"))
@@ -186,6 +197,7 @@ async fn launch(p: Value, job: Arc<Job>) -> Result<Value> {
         let _ = child.kill();
         return Err(error);
     }
+    natives.in_use = true;
     job.phase("running", "游戏正在运行");
     let minimize = settings.after_launch == "minimize" && p["minimized"] != true;
     {
@@ -217,6 +229,7 @@ async fn launch(p: Value, job: Arc<Job>) -> Result<Value> {
     log.line(&format!("Game exited: {code}"));
     drop(log);
     let _ = std::fs::remove_file(marker);
+    natives.in_use = false;
     let mut crash_report = None;
     let mut crash_error = None;
     if code != 0 {
@@ -239,6 +252,18 @@ async fn launch(p: Value, job: Arc<Job>) -> Result<Value> {
     }
     finish_exit(&job, code, &log_path, minimize, crash_report, crash_error);
     Ok(json!({"exitCode":code}))
+}
+
+struct NativeDirectory {
+    path: PathBuf,
+    in_use: bool,
+}
+impl Drop for NativeDirectory {
+    fn drop(&mut self) {
+        if !self.in_use {
+            let _ = std::fs::remove_dir_all(&self.path);
+        }
+    }
 }
 
 fn finish_exit(

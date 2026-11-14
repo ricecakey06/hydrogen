@@ -24,7 +24,7 @@ impl Default for State {
     fn default() -> Self {
         Self {
             accounts: BTreeMap::new(),
-            jobs: Jobs::default(),
+            jobs: Jobs::with_limit(16),
         }
     }
 }

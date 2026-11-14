@@ -2,9 +2,44 @@ mod common;
 use hydrogen::launcher::{net, repository, storage::Settings, tasks::Tasks};
 use serde_json::json;
 use std::{
+    fs,
     path::PathBuf,
     time::{Duration, Instant},
 };
+
+#[tokio::test]
+async fn quick_preparation_rechecks_changed_files_and_repair_rechecks_unchanged_files() {
+    let fixture = tempfile::tempdir().unwrap();
+    let game = fixture.path().join("game");
+    let host = common::plugin_host(fixture.path());
+    let mut settings = Settings::default();
+    settings.modules.insert("minecraft.download".into(), false);
+    let client = net::client(&host, &settings).unwrap();
+    let jar = game.join("versions/Test/Test.jar");
+    let index = game.join("assets/indexes/test.json");
+    for path in [&jar, &index] {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+    }
+    fs::write(&jar, b"abc").unwrap();
+    fs::write(&index, br#"{"objects":{}}"#).unwrap();
+    let metadata = json!({"id":"Test","libraries":[],"assetIndex":{"id":"test","sha1":net::hash(&client, &index).await.unwrap()},
+        "downloads":{"client":{"sha1":"a9993e364706816aba3e25717850c26c9cd0d89d","size":3}}});
+    let prepare = async |quick: bool| {
+        let mut plan = false;
+        net::task_observed(&client, "minecraft.preinstall", "prepare", json!({"gameRoot":game,"settings":settings,"metadata":metadata,"architecture":"x64","quick":quick}), None, |progress| {
+            plan |= progress["plan"].is_object();
+            Ok(())
+        }).await.map(|_| plan)
+    };
+    assert!(prepare(false).await.unwrap());
+    assert!(!prepare(true).await.unwrap());
+    assert!(prepare(false).await.unwrap());
+    std::thread::sleep(Duration::from_millis(30));
+    fs::write(&jar, b"bad").unwrap();
+    assert_eq!(prepare(true).await.unwrap_err().code, "DOWNLOADS_DISABLED");
+    assert_eq!(prepare(false).await.unwrap_err().code, "DOWNLOADS_DISABLED");
+    host.stop_all().await.unwrap();
+}
 
 // Opt-in real repository check. Does not start Java or allow downloads.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

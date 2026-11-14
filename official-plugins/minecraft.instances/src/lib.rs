@@ -59,6 +59,10 @@ impl State {
                     Ok(serde_json::to_value(store)?)
                 }
                 "records.list" => Ok(serde_json::to_value(store.instances_with_issues()?)?),
+                "records.move" => {
+                    store.move_instance(text(p, "id")?, text(p, "target")?, p["after"] == true)?;
+                    Ok(Value::Null)
+                }
                 "records.get" => Ok(serde_json::to_value(store.instance(text(p, "id")?)?)?),
                 "records.write" => {
                     store.write_instance(&serde_json::from_value(p["instance"].clone())?)?;

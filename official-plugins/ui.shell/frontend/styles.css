@@ -117,6 +117,14 @@ svg { display: block; flex-shrink: 0; }
 .section-row .text-button { font-size: calc(var(--h-font-size,16px) * 0.8125); }
 .instances-list { flex: 1; padding: 2px 6px 0 2px; }
 .instance-row { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
+[data-reorder-handle] { cursor: grab; user-select: none; }
+[data-reorder-source] { visibility: hidden; }
+.design-surface:has([data-reordering]), .design-surface:has([data-reordering]) * { cursor: grabbing; }
+[data-reorder-preview]:popover-open { position: fixed; inset: 0 auto auto 0; display: flex; margin: 0; padding: 0; pointer-events: none; user-select: none; color: inherit; background: var(--h-surface-card); box-shadow: 0 8px 24px color-mix(in srgb, var(--h-text-primary) 20%, transparent); }
+[data-reorder-preview].instance-row { border: 0; border-radius: 12px; }
+@media (prefers-reduced-motion: no-preference) {
+  [data-reordering] [data-reorder-id] { transition: translate 160ms ease-out; }
+}
 .instance-card { height: 64px; min-width: 0; flex: 1; display: flex; align-items: center; justify-content: space-between; text-align: left; gap: 12px; }
 .instance-text { min-width: 0; flex: 1; }
 .instance-name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: calc(var(--h-font-size,16px) * 1.125); }

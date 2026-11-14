@@ -2,6 +2,27 @@ use hydrogen::launcher::{java, storage::*};
 use std::fs;
 
 #[test]
+fn custom_instance_order_survives_reopening_and_new_instances() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::open(dir.path().to_path_buf()).unwrap();
+    let a = store.create("1.21.1", "A", None).unwrap().info.id;
+    let b = store.create("1.21.1", "B", None).unwrap().info.id;
+    let c = store.create("1.21.1", "C", None).unwrap().info.id;
+    store.move_instance(&c, &a, false).unwrap();
+    store.move_instance(&a, &b, true).unwrap();
+    drop(store);
+    let store = Store::open(dir.path().to_path_buf()).unwrap();
+    let new = store.create("1.21.1", "0", None).unwrap().info.id;
+    let ids: Vec<_> = store
+        .instances()
+        .unwrap()
+        .into_iter()
+        .map(|entry| entry.info.id)
+        .collect();
+    assert_eq!(ids, [c, b, a, new]);
+}
+
+#[test]
 fn mod_mirror_defaults_enable_existing_settings_and_persist_opt_out() {
     let dir = tempfile::tempdir().unwrap();
     let mut store = Store::open(dir.path().to_path_buf()).unwrap();

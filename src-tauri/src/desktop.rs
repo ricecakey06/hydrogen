@@ -331,6 +331,11 @@ enum LauncherAction {
         id: String,
         name: String,
     },
+    MoveInstance {
+        id: String,
+        target: String,
+        after: bool,
+    },
     SaveOverrides {
         id: String,
         overrides: crate::launcher::storage::Overrides,
@@ -342,6 +347,7 @@ enum LauncherAction {
     JavaScan,
     JavaChoose,
     SignIn,
+    SignInMicrosoft,
     SignOut,
     ProfileAddMicrosoft,
     ProfileAddProvider {
@@ -353,6 +359,11 @@ enum LauncherAction {
     },
     ProfileSelect {
         id: String,
+    },
+    ProfileMove {
+        id: String,
+        target: String,
+        after: bool,
     },
     ProfileDelete {
         id: String,
@@ -924,6 +935,10 @@ async fn launcher_action(
             core.rename(&id, &name)?;
             serde_json::Value::Null
         }
+        LauncherAction::MoveInstance { id, target, after } => {
+            core.store.lock().unwrap().move_instance(&id, &target, after)?;
+            serde_json::Value::Null
+        }
         LauncherAction::SaveOverrides { id, overrides } => {
             core.overrides(&id, overrides)?;
             serde_json::Value::Null
@@ -960,11 +975,13 @@ async fn launcher_action(
             core.select_profile(&id)?;
             serde_json::Value::Null
         }
+        LauncherAction::ProfileMove { id, target, after } => core.profile_change("profiles.move",serde_json::json!({"id":id,"target":target,"after":after}))?,
         LauncherAction::ProfileDelete { id, confirmation } => {
             core.delete_profile(&id, &confirmation)?;
             serde_json::Value::Null
         }
         LauncherAction::SignIn => serde_json::to_value(core.login(false)?)?,
+        LauncherAction::SignInMicrosoft => serde_json::to_value(core.login_microsoft()?)?,
         LauncherAction::SignOut => {
             core.sign_out()?;
             serde_json::Value::Null

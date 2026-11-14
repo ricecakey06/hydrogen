@@ -12,6 +12,7 @@ struct Pending {
     root: PathBuf,
     id: String,
     adding: bool,
+    session: bool,
     settings: Settings,
 }
 #[derive(Default)]
@@ -142,7 +143,7 @@ impl State {
             let result = microsoft(&method, json!({"handle":task.handle}));
             if method == "cancel" || result.as_ref().map_or(true, |v| v["ready"] == true) {
                 let task = self.tasks.remove(&id).unwrap();
-                if method == "poll" && result.is_ok() {
+                if method == "poll" && result.is_ok() && !task.session {
                     if let Err(error) = self.finish_login(&task) {
                         if task.adding {
                             let _ = cleanup(&task.root, &task.id);
@@ -209,6 +210,28 @@ impl State {
                     invoke(&id, &id, "signIn", json!({"name":profile.name}))?;
                 }
                 Ok(serde_json::to_value(profile)?)
+            }
+            "profiles.move" => {
+                let id = text(p, "id")?;
+                let index = profiles
+                    .profiles
+                    .iter()
+                    .position(|profile| profile.id == id)
+                    .ok_or_else(|| ApiError::new("PROFILE_NOT_FOUND", "此档案已不存在。"))?;
+                let target = text(p, "target")?;
+                let anchor = profiles
+                    .profiles
+                    .iter()
+                    .position(|profile| profile.id == target)
+                    .ok_or_else(|| ApiError::new("PROFILE_NOT_FOUND", "此档案已不存在。"))?;
+                let destination =
+                    anchor + usize::from(p["after"] == true) - usize::from(index < anchor);
+                if index != anchor && index != destination {
+                    let profile = profiles.profiles.remove(index);
+                    profiles.profiles.insert(destination, profile);
+                    profiles.save(&root)?;
+                }
+                Ok(Value::Null)
             }
             "profiles.delete" => {
                 let profile = profiles.get(text(p, "id")?)?.clone();
@@ -341,7 +364,11 @@ impl State {
                         json!({"ready":true,"result":invoke(provider,provider,&method,json!({"name":profile.name}))?}),
                     );
                 }
-                if !self.tasks.is_empty() {
+                if self
+                    .tasks
+                    .values()
+                    .any(|task| method != "session" || !task.session)
+                {
                     return Err(ApiError::new("ACCOUNT_BUSY", "请等待当前登录完成。"));
                 }
                 let adding = method == "signIn" && (p["newProfile"] == true || selected.is_none());
@@ -374,6 +401,7 @@ impl State {
                         root,
                         id,
                         adding,
+                        session: method == "session",
                         settings,
                     },
                 );

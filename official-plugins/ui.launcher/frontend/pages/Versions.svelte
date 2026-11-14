@@ -4,6 +4,7 @@
   import { t } from '../../../ui.shell/frontend/lib/i18n';
   import Icon from '../../../ui.shell/frontend/components/Icon.svelte';
   import InstanceIcon from '../components/InstanceIcon.svelte';
+  import { reorder } from '../lib/reorder';
   import { action, errorMessage, taskActive, type Snapshot, type GameVersion } from '../../../ui.shell/frontend/lib/api';
   import { entrance } from '../../../ui.shell/frontend/lib/motion';
   // Keep selection primary within each row, with neutral 44px settings/launch actions (§2.8, §3.2).
@@ -21,6 +22,7 @@
   let newName = $state('');
   let expanded = $state<Component | ''>('');
   let launching = $state('');
+  let moving = $state(false);
   let versions = $state<GameVersion[]>([]); let catalogKey = $state(''); let busy = $state(false); let error = $state('');
   let loader = $state(''); let loaderKind = $state<LoaderKind>('fabric'); let fabricApi = $state(''); let optionsBusy = $state(false);
   const visibleComponents = $derived<readonly Component[]>(!loader ? loaderKinds : loaderKind === 'fabric' ? ['fabric', 'fabricApi'] : [loaderKind]);
@@ -67,9 +69,20 @@
   }
   async function install() { busy = true; error = ''; try { await action('createInstance', { version: selectedVersion, name: newName, components: loader ? { kind: loaderKind, loader, fabricApi: fabricApi || null } : null }); await onchange(); mode = 'instances'; ondownloads(); } catch (e) { error = errorMessage(e); } finally { busy = false; } }
   async function launch(id: string) {
-    if (!snapshot || launching || login || snapshot.tasks.some(task => task.instanceId === id && taskActive(task))) return;
+    if (!snapshot || launching || login || launchBlocked(id)) return;
     launching = id; error = '';
     try { await onlaunch(id); } catch (e) { error = errorMessage(e); } finally { launching = ''; }
+  }
+  function launchBlocked(id: string) {
+    return snapshot?.tasks.some(task => task.instanceId === id && taskActive(task)
+      && !(task.kind === 'launch' && task.phase === 'running'));
+  }
+  async function move(id: string, target: string, after: boolean) {
+    moving = true;
+    error = '';
+    try { await action('moveInstance', { id, target, after }); await onchange(); }
+    catch (e) { error = errorMessage(e); }
+    finally { moving = false; }
   }
 </script>
 
@@ -77,22 +90,22 @@
   {#key mode}<div class="version-pane" in:entrance|global>
   {#if mode === 'instances'}
     <div class="section-row"><h2 class="section-label">{t("游戏实例")}</h2>{#if onimportpack}<button data-h-part="button" class="text-button" disabled={snapshot?.readOnly} onclick={onimportpack}>{t("导入整合包")}</button>{/if}</div>
-    <div class="scroll-pane instances-list">
+    <div class="scroll-pane instances-list" use:reorder={{ disabled: moving || !!snapshot?.readOnly, move }}>
       {#each instances as instance (instance.id)}
-        {@const activeTask = snapshot?.tasks.find(task => task.instanceId === instance.id && taskActive(task))}
-        {@const launchTitle = activeTask ? activeTask.kind === 'launch' && activeTask.phase === 'running' ? t("游戏正在运行") : t("此实例有任务正在进行") : login ? t("请等待账号登录完成") : launching ? t("正在提交启动请求") : snapshot?.account.status !== 'signedIn' ? t("前往档案管理登录") : t("启动 {0}", instance.name)}
+        {@const blocked = launchBlocked(instance.id)}
+        {@const launchTitle = blocked ? t("此实例有任务正在进行") : login ? t("请等待账号登录完成") : launching ? t("正在提交启动请求") : snapshot?.account.status !== 'signedIn' ? t("前往档案管理登录") : t("启动 {0}", instance.name)}
         <PluginContextMenu {snapshot} location="instance.contextMenu" context={{ instanceId: instance.id }} {onchange}>
-        <div class="instance-row">
-          <button data-h-part="button" class="instance-card" disabled={!instance.isInstalled} aria-pressed={snapshot?.selectedInstanceId === instance.id} onclick={() => onselect(instance.id)}>
+        <div class="instance-row" data-reorder-id={instance.id}>
+          <button data-h-part="button" class="instance-card" data-reorder-handle={instances.length > 1 && !snapshot?.readOnly && !moving ? '' : undefined} aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" aria-disabled={!instance.isInstalled} aria-pressed={snapshot?.selectedInstanceId === instance.id} onclick={() => instance.isInstalled && onselect(instance.id)}>
             <InstanceIcon {instance} custom={snapshot?.instanceIcons?.[instance.id]} />
             <span class="instance-text"><span class="instance-name">{instance.name}</span><span class="instance-version">{instance.gameVersion} · {instance.loaderName || (instance.components ? 'Fabric' : t("原版"))} · {instance.isInstalled ? t("已安装") : t("安装未完成")}</span></span>
             {#if snapshot?.selectedInstanceId === instance.id}<span class="current-instance">{t("当前实例")}</span>{/if}
           </button>
           <button data-h-part="button" class="icon-button instance-settings" aria-label={t("{0}的实例设置", instance.name)} onclick={() => onsettings(instance.id)}><Icon name="settings" size={22} /></button>
           {#if instance.isInstalled}
-            <button data-h-part="button" data-h-variant="launch" class="icon-button instance-launch" aria-label={t("启动实例：{0}", instance.name)} title={launchTitle} disabled={!!launching || !!login || !!activeTask} onclick={() => launch(instance.id)}><Icon name="play" size={22} /></button>
+            <button data-h-part="button" data-h-variant="launch" class="icon-button instance-launch" aria-label={t("启动实例：{0}", instance.name)} title={launchTitle} disabled={!!launching || !!login || !!blocked || snapshot?.readOnly} onclick={() => launch(instance.id)}><Icon name="play" size={22} /></button>
           {:else}
-            <button data-h-part="button" disabled={!!activeTask || snapshot?.readOnly} onclick={() => onrepair(instance.id)}>{t("重试安装")}</button>
+            <button data-h-part="button" disabled={!!blocked || snapshot?.readOnly} onclick={() => onrepair(instance.id)}>{t("重试安装")}</button>
           {/if}
         </div>
         </PluginContextMenu>

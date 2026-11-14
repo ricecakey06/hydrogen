@@ -373,6 +373,13 @@ impl Store {
     pub fn instances(&self) -> Result<Vec<Instance>> {
         Ok(self.instances_with_issues()?.0)
     }
+    pub fn move_instance(&self, id: &str, target: &str, after: bool) -> Result<()> {
+        self.records(
+            "records.move",
+            serde_json::json!({"id":id,"target":target,"after":after}),
+        )?;
+        Ok(())
+    }
     pub fn instances_with_issues(&self) -> Result<(Vec<Instance>, Vec<String>)> {
         Ok(serde_json::from_value(
             self.records("records.list", serde_json::json!({}))?,

@@ -44,8 +44,8 @@ impl Launcher {
             ));
         }
         self.require("minecraft.launch")?;
-        let instance_lock = self.instance_lock(&id)?;
         let root = self.lease();
+        let instance_lock = self.lock_instance(&id, true)?;
         let mut instance = self.store.lock().unwrap().instance(&id)?;
         if let Some(memory) = patch["maxMemoryMib"].as_u64() {
             instance.overrides.max_memory_mib = Some(memory as u32);

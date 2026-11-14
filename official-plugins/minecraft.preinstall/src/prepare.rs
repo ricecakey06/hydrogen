@@ -7,10 +7,12 @@ use hydrogen_plugin_services::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use sha1::{Digest, Sha1};
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
     sync::Arc,
+    time::SystemTime,
 };
 fn allows(
     client: &net::Client,
@@ -39,6 +41,58 @@ pub struct FileSpec {
     pub url: String,
     pub hash: String,
     pub size: Option<u64>,
+}
+#[derive(Deserialize, Serialize, PartialEq)]
+struct VerifiedFile {
+    hash: String,
+    size: u64,
+    modified: SystemTime,
+    created: Option<SystemTime>,
+}
+impl VerifiedFile {
+    fn read(file: &FileSpec, path: &Path) -> Option<Self> {
+        if !net::valid_hash(&file.hash) {
+            return None;
+        }
+        let metadata = path.metadata().ok()?;
+        if !metadata.is_file() || file.size.is_some_and(|size| size != metadata.len()) {
+            return None;
+        }
+        Some(Self {
+            hash: file.hash.to_ascii_lowercase(),
+            size: metadata.len(),
+            modified: metadata.modified().ok()?,
+            created: metadata.created().ok(),
+        })
+    }
+}
+type Verification = BTreeMap<String, VerifiedFile>;
+// Keep concurrent preparations within the file service's job limit.
+static FILE_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(32);
+
+async fn ensure_file(
+    client: &net::Client,
+    root: &Path,
+    settings: &Settings,
+    file: &FileSpec,
+    job: &Job,
+) -> Result<(PathBuf, Option<VerifiedFile>)> {
+    let _permit = FILE_SLOTS.acquire().await.map_err(|_| invalid())?;
+    job.check()?;
+    let path = net::ensure_game_file(
+        client,
+        root,
+        &file.relative,
+        &file.url,
+        (!file.hash.is_empty()).then_some(file.hash.as_str()),
+        file.size,
+        settings.download_source == "bmclapi",
+        settings.enabled("minecraft.download"),
+        job,
+    )
+    .await?;
+    let stamp = VerifiedFile::read(file, &path);
+    Ok((path, stamp))
 }
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Prepared {
@@ -158,6 +212,7 @@ fn library_spec(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn prepare(
     plugins: &hydrogen_plugin_services::PluginHost,
     client: &net::Client,
@@ -165,6 +220,7 @@ pub async fn prepare(
     settings: &Settings,
     metadata: Value,
     architecture: &str,
+    quick: bool,
     job: Arc<Job>,
 ) -> Result<Prepared> {
     let id = text(&metadata, "id")?;
@@ -173,6 +229,18 @@ pub async fn prepare(
         .map(String::from)
         .unwrap_or_else(|| format!("versions/{id}/{id}.jar"));
     let destination = storage::within(game_root, &jar)?;
+    let key = format!("{jar}\0{architecture}");
+    let cache_path = storage::within(
+        game_root,
+        &format!(".hydrogen/verified-v1/{:x}.json", Sha1::digest(key)),
+    )
+    .ok();
+    let cached: Verification = cache_path
+        .as_deref()
+        .filter(|_| quick)
+        .and_then(|path| storage::read_json(path).ok())
+        .unwrap_or_default();
+    let mut verified = Verification::new();
     let client_hash = metadata["downloads"]["client"]["sha1"]
         .as_str()
         .unwrap_or("");
@@ -246,20 +314,20 @@ pub async fn prepare(
         &metadata["assetIndex"],
         format!("assets/indexes/{asset_index}.json"),
     )?;
-    job.begin_download([(index_file.relative.clone(), None)], false);
-    let index_path = net::ensure_game_file(
-        client,
-        game_root,
-        &index_file.relative,
-        &index_file.url,
-        (!index_file.hash.is_empty()).then_some(index_file.hash.as_str()),
-        index_file.size,
-        settings.download_source == "bmclapi",
-        settings.enabled("minecraft.download"),
-        &job,
-    )
-    .await?;
-    files.push(index_file);
+    let index_path = storage::within(game_root, &index_file.relative)?;
+    let index_stamp = VerifiedFile::read(&index_file, &index_path);
+    let (index_path, index_stamp) = if index_stamp
+        .as_ref()
+        .is_some_and(|stamp| cached.get(&index_file.relative) == Some(stamp))
+    {
+        (index_path, index_stamp)
+    } else {
+        job.begin_download([(index_file.relative.clone(), None)], false);
+        ensure_file(client, game_root, settings, &index_file, &job).await?
+    };
+    if let Some(stamp) = index_stamp {
+        verified.insert(index_file.relative, stamp);
+    }
     let index: Value = storage::read_json(&index_path)?;
     for value in index["objects"].as_object().ok_or_else(invalid)?.values() {
         let hash = text(value, "hash")?;
@@ -358,60 +426,65 @@ pub async fn prepare(
     };
     classpath.push(storage::within(game_root, &jar)?);
     let mut seen = BTreeSet::new();
-    let unique: Vec<_> = files
+    let mut pending = Vec::new();
+    let mut missing = 0_u64;
+    for file in files
         .into_iter()
         .filter(|file| seen.insert(file.relative.clone()))
-        .collect();
-    if let Some(available) = available_space(plugins, settings, game_root)? {
-        let missing = unique.iter().try_fold(0_u64, |sum, file| {
-            let destination = storage::within(game_root, &file.relative)?;
-            let cached = destination
-                .metadata()
-                .is_ok_and(|metadata| file.size.is_none_or(|size| metadata.len() == size));
-            if cached {
-                Ok(sum)
-            } else {
-                sum.checked_add(file.size.unwrap_or(0)).ok_or_else(invalid)
-            }
-        })?;
-        if available < missing.saturating_add(64 * 1024 * 1024) {
-            return Err(ApiError::new(
-                "INSUFFICIENT_SPACE",
-                format!("至少需要 {} MB 可用空间。", missing / (1024 * 1024) + 64),
-            ));
+    {
+        job.check()?;
+        let destination = storage::within(game_root, &file.relative)?;
+        if let Some(stamp) = VerifiedFile::read(&file, &destination)
+            && cached.get(&file.relative) == Some(&stamp)
+        {
+            verified.insert(file.relative, stamp);
+            continue;
         }
+        if let Some(size) = file.size
+            && !destination
+                .metadata()
+                .is_ok_and(|metadata| metadata.is_file() && metadata.len() == size)
+        {
+            missing = missing.checked_add(size).ok_or_else(invalid)?;
+        }
+        pending.push(file);
     }
-    job.begin_download(
-        unique.iter().map(|file| (file.relative.clone(), file.size)),
-        true,
-    );
-    let limit = Arc::new(tokio::sync::Semaphore::new(32));
+    if !pending.is_empty()
+        && let Some(available) = available_space(plugins, settings, game_root)?
+        && available < missing.saturating_add(64 * 1024 * 1024)
+    {
+        return Err(ApiError::new(
+            "INSUFFICIENT_SPACE",
+            format!("至少需要 {} MB 可用空间。", missing / (1024 * 1024) + 64),
+        ));
+    }
+    if !pending.is_empty() {
+        job.begin_download(
+            pending
+                .iter()
+                .map(|file| (file.relative.clone(), file.size)),
+            true,
+        );
+    }
     let mut running = futures_util::stream::FuturesUnordered::new();
-    for file in unique {
-        let client = client.clone();
-        let game_root = game_root.to_path_buf();
-        let settings = settings.clone();
-        let job = job.clone();
-        let limit = limit.clone();
+    for file in pending {
+        let job = &job;
         running.push(async move {
-            let _permit = limit.acquire().await.map_err(|_| invalid())?;
-            net::ensure_game_file(
-                &client,
-                &game_root,
-                &file.relative,
-                &file.url,
-                (!file.hash.is_empty()).then_some(file.hash.as_str()),
-                file.size,
-                settings.download_source == "bmclapi",
-                settings.enabled("minecraft.download"),
-                &job,
-            )
-            .await
-            .map(|_| file.relative)
+            let (_, stamp) = ensure_file(client, game_root, settings, &file, job).await?;
+            Ok::<_, ApiError>((file.relative, stamp))
         });
     }
     while let Some(result) = running.next().await {
-        result?;
+        let (relative, stamp) = result?;
+        if let Some(stamp) = stamp {
+            verified.insert(relative, stamp);
+        }
+    }
+    if let Some(path) = cache_path
+        && verified != cached
+    {
+        // Cache writes are optional, including when launching from a read-only repository.
+        let _ = storage::write_json(&path, &verified);
     }
     let assets = if index["virtual"] == true {
         storage::within(game_root, &format!("assets/virtual/{asset_index}"))?

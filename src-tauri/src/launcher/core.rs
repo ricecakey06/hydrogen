@@ -200,21 +200,12 @@ impl Launcher {
         })
     }
     pub fn instance_lock(&self, id: &str) -> Result<File> {
+        self.lock_instance(id, false)
+    }
+    pub(crate) fn lock_instance(&self, id: &str, launching: bool) -> Result<File> {
         let store = self.store.lock().unwrap();
         store.writable()?;
         let _ = store.instance(id)?;
-        let marker = storage::within(&store.root, &format!("instances/{id}/process.json"))?;
-        if marker.exists() {
-            let value: Value = storage::read_json(&marker)?;
-            if let (Some(pid), Some(stamp)) = (value["pid"].as_u64(), value["stamp"].as_u64())
-                && process::stamp(&self.plugins, &store.settings, pid as u32)? == Some(stamp)
-            {
-                return Err(ApiError::new(
-                    "INSTANCE_RUNNING",
-                    "此实例的游戏仍在运行，不能修改其目录。",
-                ));
-            }
-        }
         let directory = storage::within(&store.root, &format!("instances/{id}"))?;
         std::fs::create_dir_all(directory)?;
         let file = OpenOptions::new()
@@ -226,9 +217,47 @@ impl Launcher {
                 &store.root,
                 &format!("instances/{id}/instance.lock"),
             )?)?;
-        file.try_lock()
-            .map_err(|_| ApiError::new("INSTANCE_BUSY", "实例正用于安装、启动或文件操作。"))?;
+        let lock = if launching {
+            file.try_lock_shared()
+        } else {
+            file.try_lock()
+        };
+        lock.map_err(|_| ApiError::new("INSTANCE_BUSY", "实例正用于安装、启动或文件操作。"))?;
+        if !launching && self.instance_running(&store, id)? {
+            return Err(ApiError::new(
+                "INSTANCE_RUNNING",
+                "此实例的游戏仍在运行，不能修改其目录。",
+            ));
+        }
         Ok(file)
+    }
+    fn instance_running(&self, store: &Store, id: &str) -> Result<bool> {
+        let legacy = storage::within(&store.root, &format!("instances/{id}/process.json"))?;
+        let directory = storage::within(&store.root, &format!("instances/{id}/processes"))?;
+        let mut markers = vec![legacy];
+        if directory.is_dir() {
+            for entry in std::fs::read_dir(&directory)? {
+                let entry = entry?;
+                if entry.path().extension().is_some_and(|ext| ext == "json") {
+                    markers.push(storage::within(
+                        &directory,
+                        &entry.file_name().to_string_lossy(),
+                    )?);
+                }
+            }
+        }
+        for marker in markers {
+            if !marker.is_file() {
+                continue;
+            }
+            let value: Value = storage::read_json(&marker)?;
+            if let Some((pid, stamp)) = value["pid"].as_u64().zip(value["stamp"].as_u64())
+                && process::stamp(&self.plugins, &store.settings, pid as u32)? == Some(stamp)
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
     pub fn save_settings(&self, settings: Settings) -> Result<()> {
         let lease = self.lease();
@@ -278,21 +307,11 @@ impl Launcher {
                 ));
             }
             for instance in store.instances()? {
-                let marker = storage::within(
-                    &store.root,
-                    &format!("instances/{}/process.json", instance.info.id),
-                )?;
-                if marker.is_file() {
-                    let marker: Value = storage::read_json(&marker)?;
-                    if let Some((pid, stamp)) = marker["pid"].as_u64().zip(marker["stamp"].as_u64())
-                        && process::stamp(&self.plugins, &store.settings, pid as u32)?
-                            == Some(stamp)
-                    {
-                        return Err(ApiError::new(
-                            "GAME_RUNNING",
-                            "已有游戏使用当前目录，请退出后再更改游戏目录或隔离设置。",
-                        ));
-                    }
+                if self.instance_running(&store, &instance.info.id)? {
+                    return Err(ApiError::new(
+                        "GAME_RUNNING",
+                        "已有游戏使用当前目录，请退出后再更改游戏目录或隔离设置。",
+                    ));
                 }
             }
         }
@@ -343,17 +362,8 @@ impl Launcher {
             return Ok(());
         }
         for instance in store.instances()? {
-            let marker = storage::within(
-                &store.root,
-                &format!("instances/{}/process.json", instance.info.id),
-            )?;
-            if marker.exists() {
-                let marker: Value = storage::read_json(&marker)?;
-                if let Some((pid, stamp)) = marker["pid"].as_u64().zip(marker["stamp"].as_u64())
-                    && process::stamp(&self.plugins, &store.settings, pid as u32)? == Some(stamp)
-                {
-                    return Err(ApiError::new("GAME_RUNNING", "已有游戏使用当前数据目录。"));
-                }
+            if self.instance_running(&store, &instance.info.id)? {
+                return Err(ApiError::new("GAME_RUNNING", "已有游戏使用当前数据目录。"));
             }
         }
         let game_root = game_root(&root, &self.default_root, self.default_game_root.as_deref());
@@ -541,27 +551,30 @@ impl Launcher {
         Ok(())
     }
     pub fn login(self: &Arc<Self>, restore: bool) -> Result<String> {
-        self.login_inner(restore, false)
+        self.login_inner(restore, false, false)
+    }
+    pub fn login_microsoft(self: &Arc<Self>) -> Result<String> {
+        self.login_inner(false, true, false)
     }
     pub fn add_microsoft_profile(self: &Arc<Self>) -> Result<String> {
-        self.login_inner(false, true)
+        self.login_inner(false, true, true)
     }
-    fn login_inner(self: &Arc<Self>, restore: bool, adding: bool) -> Result<String> {
+    fn login_inner(
+        self: &Arc<Self>,
+        restore: bool,
+        microsoft: bool,
+        adding: bool,
+    ) -> Result<String> {
         let _identity = self.identity.lock().unwrap();
         self.store.lock().unwrap().writable()?;
         let mut root = self.lease();
-        if self
-            .tasks
-            .list()
-            .iter()
-            .any(|t| t.active() && ["login", "launch"].contains(&t.kind.as_str()))
-        {
+        if self.tasks.account_busy() {
             return Err(ApiError::new(
                 "ACCOUNT_BUSY",
-                "请等待登录或游戏结束后更改档案。",
+                "请等待登录或启动账号检查完成后更改档案。",
             ));
         }
-        if adding {
+        if microsoft {
             root.settings.account_mode = "microsoft".into();
         }
         let job = self.tasks.start("login", None)?;
@@ -589,7 +602,7 @@ impl Launcher {
                 }
             };
             let mut result = tokio::select! {_=job.cancel.cancelled()=>Err(ApiError::new("CANCELLED","登录已取消。")),result=authenticate=>result};
-            if result.is_ok() && adding {
+            if result.is_ok() && microsoft {
                 let mut store = this.store.lock().unwrap();
                 let mut settings = store.settings.clone();
                 settings.account_mode = "microsoft".into();
@@ -599,7 +612,7 @@ impl Launcher {
                 }
             }
             if let Err(error) = &result {
-                if !adding {
+                if !microsoft {
                     this.accounts
                         .failure(&root.root, &root.settings, &error.message);
                 }
@@ -641,15 +654,10 @@ impl Launcher {
         let _identity = self.identity.lock().unwrap();
         let store = self.store.lock().unwrap();
         store.writable()?;
-        if self
-            .tasks
-            .list()
-            .iter()
-            .any(|t| t.active() && ["login", "launch"].contains(&t.kind.as_str()))
-        {
+        if self.tasks.account_busy() {
             return Err(ApiError::new(
                 "ACCOUNT_BUSY",
-                "请等待登录或游戏结束后更改档案。",
+                "请等待登录或启动账号检查完成后更改档案。",
             ));
         }
         self.accounts
@@ -660,15 +668,10 @@ impl Launcher {
             let _identity = self.identity.lock().unwrap();
             let mut store = self.store.lock().unwrap();
             store.writable()?;
-            if self
-                .tasks
-                .list()
-                .iter()
-                .any(|t| t.active() && ["login", "launch"].contains(&t.kind.as_str()))
-            {
+            if self.tasks.account_busy() {
                 return Err(ApiError::new(
                     "ACCOUNT_BUSY",
-                    "请等待登录或游戏结束后切换档案。",
+                    "请等待登录或启动账号检查完成后切换档案。",
                 ));
             }
             let list = self.accounts.profiles(
@@ -726,15 +729,10 @@ impl Launcher {
     }
     pub fn sign_out(&self) -> Result<()> {
         let _identity = self.identity.lock().unwrap();
-        if self
-            .tasks
-            .list()
-            .iter()
-            .any(|t| t.active() && ["login", "launch"].contains(&t.kind.as_str()))
-        {
+        if self.tasks.account_busy() {
             return Err(ApiError::new(
                 "ACCOUNT_BUSY",
-                "请等待当前登录或游戏结束后退出账号。",
+                "请等待登录或启动账号检查完成后退出账号。",
             ));
         }
         let lease = self.lease();

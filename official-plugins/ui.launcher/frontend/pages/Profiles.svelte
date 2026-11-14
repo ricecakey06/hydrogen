@@ -6,6 +6,7 @@
   import Icon from '../../../ui.shell/frontend/components/Icon.svelte';
   import PlayerAvatar from '../../../ui.shell/frontend/components/PlayerAvatar.svelte';
   import { entrance } from '../../../ui.shell/frontend/lib/motion';
+  import { reorder } from '../lib/reorder';
 
   // Primary: selected identity and one add action. Secondary: available profiles.
   // Reuse the shell's neutral colors, 24px page inset, 12/16px spacing and 8/12px radii (§2.8, §3.2).
@@ -21,8 +22,8 @@
   const profiles = $derived(account?.profiles ?? []);
   const login = $derived(snapshot?.tasks.find(t => t.kind === 'login' && taskActive(t)));
   const lastLogin = $derived(snapshot?.tasks.find(t => t.kind === 'login'));
-  const gameRunning = $derived(snapshot?.tasks.some(t => t.kind === 'launch' && taskActive(t)));
-  const locked = $derived(pending || !!login || !!gameRunning || !snapshot || !!snapshot.readOnly);
+  const checkingAccount = $derived(snapshot?.tasks.some(t => t.kind === 'launch' && ['queued', 'checking'].includes(t.phase)));
+  const locked = $derived(pending || !!login || !!checkingAccount || !snapshot || !!snapshot.readOnly);
   const microsoftAvailable = $derived(snapshot?.plugins.some(p => p.id === 'account.microsoft' && p.enabled && !p.problem));
 
   async function operate(type: string, fields: Record<string, unknown> = {}) {
@@ -73,7 +74,7 @@
     <div><h2>{t("游戏档案")}</h2><p class="caption">{t("选择启动游戏时使用的正版账号或离线玩家。")}</p></div>
     <button data-h-part="button" data-h-variant="primary" class="primary profile-add" disabled={locked || adding} onclick={openAdd}><Icon name="plus" size={18} />{t("添加档案")}</button>
   </div>
-  {#if gameRunning}<p class="caption profile-feedback" role="status">{t("游戏运行或准备启动期间，暂时无法更改档案。")}</p>{/if}
+  {#if checkingAccount}<p class="caption profile-feedback" role="status">{t("正在检查启动档案，请稍候。")}</p>{/if}
   {#if snapshot?.readOnly}<p class="issue profile-feedback">{t("当前数据目录只读，暂时无法更改档案。")}</p>{/if}
   {#if account?.status === 'unavailable' && account.detail}<p class="issue profile-feedback" role="alert">{t(account.detail)}</p>{/if}
   {#if login && login.phase !== 'restoring'}
@@ -99,12 +100,12 @@
       </form>
     {/if}
     {#if profiles.length}
-      <div class="profile-list" role="list" aria-label={t("已保存档案")}>
+      <div class="profile-list" role="list" aria-label={t("已保存档案")} use:reorder={{ disabled: locked, move: (id, target, after) => operate('profileMove', { id, target, after }) }}>
         {#each profiles as profile (profile.id)}
           {@const selected = profile.id === account?.selectedProfileId}
           {@const available = profile.kind === 'offline' ? account?.offlineAvailable : microsoftAvailable}
-          <div data-h-part="card" class="profile-row" class:is-selected={selected} role="listitem">
-            <button data-h-part="button" class="profile-select" class:profile-unavailable={!available} aria-label={`${selected ? (account?.status === 'signedOut' || account?.status === 'cached') ? t("重新登录") : t("当前档案") : t("使用档案")}：${profile.name}`} aria-pressed={selected} disabled={locked || !available} onclick={() => select(profile)}>
+          <div data-h-part="card" class="profile-row" class:is-selected={selected} role="listitem" data-reorder-id={profile.id}>
+            <button data-h-part="button" class="profile-select" class:profile-unavailable={!available} data-reorder-handle={profiles.length > 1 && !locked ? '' : undefined} aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" aria-label={`${selected ? (account?.status === 'signedOut' || account?.status === 'cached') ? t("重新登录") : t("当前档案") : t("使用档案")}：${profile.name}`} aria-pressed={selected} disabled={locked} aria-disabled={!available} onclick={() => available && select(profile)}>
               <span class="profile-avatar"><PlayerAvatar skin={profile.skin} size={48} iconSize={28} iconWidth={1.5} /></span>
               <span class="profile-info"><strong>{profile.name}</strong><span>{profile.kind === 'microsoft' ? t("正版账号") : t("离线玩家")}{!available ? t(" · 插件未启用") : selected && (account?.status === 'signedOut' || account?.status === 'cached') ? t(" · 需要登录") : ''}</span></span>
               <span class="profile-choice">{#if selected}<Icon name="check" size={18} /><span>{(account?.status === 'signedOut' || account?.status === 'cached') ? t("重新登录") : t("正在使用")}</span>{:else}{t("使用此档案")}{/if}</span>

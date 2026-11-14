@@ -16,7 +16,7 @@ A simple interface · Everything is a plugin
 
 </div>
 
-Hydrogen uses plugins to provide its interface, account management and game management features. The current version is **0.3.0**.
+Hydrogen uses plugins to provide its interface, account management and game management features. The current version is **0.3.5**.
 
 The project is under development and primarily written with AI. Long-term usability and stability still require ongoing validation.
 
